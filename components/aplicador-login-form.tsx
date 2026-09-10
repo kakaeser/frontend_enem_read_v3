@@ -42,7 +42,7 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
   }, [router])
 
   useEffect(() => {
-    fetch(`${base}/exams`)
+    fetch(`${base}/exams?status=in_progress`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => setExams(Array.isArray(d) ? d : []))
       .catch(() => setExams([]))
@@ -119,7 +119,7 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
                   <option value="">Selecione a prova</option>
                   {exams.map((ex) => (
                     <option key={ex.id} value={String(ex.id)}>
-                      {ex.nome} ({ex.status})
+                      {ex.nome}
                     </option>
                   ))}
                 </select>

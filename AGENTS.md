@@ -97,6 +97,7 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 - Backend specs: `src/**/*.spec.ts` (vitest) vs `test/**/*.e2e-spec.ts` com `supertest` sobre `AppModule` — seam HTTP único.
 - Prisma 6 pinned (não v7/v8 RC) — `driverAdapters` breaking change evitado.
 - `app/layout.tsx:20` tipagem `LayoutProps<"/">` é Next 16 — não trocar por `PropsWithChildren`.
+- shadcn/ui: `npx shadcn add` sobrescreve `app/globals.css` com paleta `oklch` + `@import "tw-animate-css"`/`shadcn/tailwind.css` — sempre deletar e manter apenas PALETA OFICIAL ENEM DA READ comentada em `globals.css:6` (`--read-green`/`--read-logo-dark`/etc.) e usar só `bg-read-*`/`text-read-*`. Não reintroduzir tokens `oklch`.
 
 ## Specs
 
