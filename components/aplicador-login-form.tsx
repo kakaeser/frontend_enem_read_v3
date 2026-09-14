@@ -38,7 +38,7 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
     if (!token || !isTokenValid(token)) return
     const payload = decodePayload(token)
     if (payload?.type === "adm") router.replace("/manage")
-    else router.replace("login/aplicador/aguardando")
+    else router.replace("/aguardando")
   }, [router])
 
   useEffect(() => {
@@ -69,16 +69,27 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
           body: JSON.stringify({ nome: nome.trim(), provaId: Number(provaId) }),
         })
         if (!c.ok) throw new Error("Erro ao solicitar acesso")
-        setMsg({ type: "success", text: "Solicitação enviada! Aguarde aprovação do ADM (PENDENTE)." })
+        localStorage.setItem("pending_aplicador_nome", nome.trim())
+        localStorage.setItem("pending_aplicador_provaId", String(provaId))
+        router.replace(`/aguardando?nome=${encodeURIComponent(nome.trim())}&provaId=${provaId}`)
         return
       }
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
+        const msgText = d.message ?? ""
+        if (msgText.includes("PENDENTE")) {
+          localStorage.setItem("pending_aplicador_nome", nome.trim())
+          localStorage.setItem("pending_aplicador_provaId", String(provaId))
+          router.replace(`/aguardando?nome=${encodeURIComponent(nome.trim())}&provaId=${provaId}`)
+          return
+        }
         throw new Error(d.message ?? "Acesso pendente ou rejeitado.")
       }
       const { access_token, refresh_token } = await res.json()
       localStorage.setItem("access_token", access_token)
       if (refresh_token) localStorage.setItem("refresh_token", refresh_token)
+      localStorage.removeItem("pending_aplicador_nome")
+      localStorage.removeItem("pending_aplicador_provaId")
       setMsg({ type: "success", text: "Logado!" })
       router.replace("/aguardando")
     } catch (err) {
@@ -98,12 +109,12 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
                 <h1 className="text-2xl font-bold text-read-white">Aplicador</h1>
                 <p className="text-balance text-sm text-read-gray">Só o nome. Se já existe na prova, loga direto. Senão cria como PENDENTE.</p>
               </div>
-              {exams.length === 0 && <p className="text-sm text-read-gray">Nenhuma prova cadastrada ainda.</p>}
+              {exams.length === 0 && <p className="text-sm text-read-gray">Nenhuma prova em andamento — peça ao ADM para criar e colocar em andamento.</p>}
               <Field>
                 <FieldLabel htmlFor="nome" className="text-read-white">
                   Nome
                 </FieldLabel>
-                <Input id="nome" placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
+                <Input id="nome" placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} required disabled={exams.length === 0} className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green disabled:opacity-50" />
               </Field>
               <Field>
                 <FieldLabel htmlFor="provaId" className="text-read-white">
@@ -114,7 +125,8 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
                   value={provaId}
                   onChange={(e) => setProvaId(e.target.value)}
                   required
-                  className="flex h-9 w-full rounded-md border border-read-ink bg-read-ink px-3 py-1 text-sm text-read-white focus-visible:ring-1 focus-visible:ring-read-green"
+                  disabled={exams.length === 0}
+                  className="flex h-9 w-full rounded-md border border-read-ink bg-read-ink px-3 py-1 text-sm text-read-white focus-visible:ring-1 focus-visible:ring-read-green disabled:opacity-50"
                 >
                   <option value="">Selecione a prova</option>
                   {exams.map((ex) => (
@@ -126,7 +138,7 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
               </Field>
               {msg && <p className={`text-sm ${msg.type === "error" ? "text-red-400" : "text-read-green"}`}>{msg.text}</p>}
               <Field>
-                <Button type="submit" disabled={loading} className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white">
+                <Button type="submit" disabled={loading || exams.length === 0} className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white disabled:opacity-50">
                   {loading ? "Enviando..." : "Continuar"}
                 </Button>
               </Field>

@@ -13,8 +13,18 @@
   --read-gray: #bdbebd;
   --read-logo-dark: #131f20;
   --read-ink: #1a2424;
-  --read-ink-dark: #0E1212;
+  --read-ink-dark: #0e1212;
   --read-darkest: #0a0c0c;
+
+  /* Sidebar — fundo dark-ink, header ink */
+  --sidebar: var(--read-ink-dark);
+  --sidebar-foreground: var(--read-white);
+  --sidebar-primary: var(--read-green);
+  --sidebar-primary-foreground: var(--read-logo-dark);
+  --sidebar-accent: var(--read-ink);
+  --sidebar-accent-foreground: var(--read-green);
+  --sidebar-border: var(--read-ink);
+  --sidebar-ring: var(--read-green);
 }
 
 @theme inline {
@@ -31,7 +41,15 @@
   --color-read-gray: var(--read-gray);
   --color-read-logo-dark: var(--read-logo-dark);
   --color-read-ink: var(--read-ink);
+  --color-read-ink-dark: var(--read-ink-dark);
   --color-read-darkest: var(--read-darkest);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 body {
@@ -45,7 +63,7 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px var(--read-ink) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--read-logo-dark) inset !important;
   -webkit-text-fill-color: var(--read-white) !important;
   caret-color: var(--read-white);
   transition: background-color 9999s ease-in-out 0s;

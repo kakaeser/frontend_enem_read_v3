@@ -98,6 +98,7 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 - Prisma 6 pinned (não v7/v8 RC) — `driverAdapters` breaking change evitado.
 - `app/layout.tsx:20` tipagem `LayoutProps<"/">` é Next 16 — não trocar por `PropsWithChildren`.
 - shadcn/ui: `npx shadcn add` sobrescreve `app/globals.css` com paleta `oklch` + `@import "tw-animate-css"`/`shadcn/tailwind.css` — sempre deletar e manter apenas PALETA OFICIAL ENEM DA READ comentada em `globals.css:6` (`--read-green`/`--read-logo-dark`/etc.) e usar só `bg-read-*`/`text-read-*`. Não reintroduzir tokens `oklch`.
+- Paleta travada (não criar cores novas): `app/globals.css:6` é fonte da verdade — 8 oficiais `#05dd86` `#196143` `#248fa3` `#3e9eb5` `#414342` `#f6f9f9` `#bdbebd` `#131f20` + 3 variações `#1a2424` `read-ink`, `#0e1212` `read-ink-dark`, `#0a0c0c` `read-darkest` (sidebar/header), já mapeadas em `--sidebar` via `var(--read-*)`. Ao instalar shadcn, fazer `cp globals.css.bak && npx shadcn add ... && git diff` e reverter qualquer `oklch` ou hex novo; hovers devem ser diferentes do bg (ex: `bg-read-ink` → `hover:bg-read-dark`, nunca `hover:bg-read-ink`).
 
 ## Specs
 
