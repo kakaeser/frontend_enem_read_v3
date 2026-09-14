@@ -58,6 +58,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Overscroll (bounce do macOS/trackpad) revela o fundo raiz — todas as
+   páginas do app são escuras, então a raiz também deve ser escura
+   (o --background claro é resto do template create-next-app) */
+html {
+  background-color: var(--read-darkest);
+}
+
 /* Chrome autofill força bg branco — sobrescreve para o tema escuro */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
