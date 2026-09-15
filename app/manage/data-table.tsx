@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useTable, type ColumnDef, type RowData, type SortingState, type ColumnFiltersState } from "@tanstack/react-table"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
 import { CreateExamDialog } from "@/components/create-exam-dialog"
 import { features, type DataTableFeatures } from "./data-table-features"
 
@@ -31,17 +31,15 @@ export function DataTable<TData extends RowData>({ columns, data, onCreated }: D
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
-          <Input
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
+          <input
             placeholder="Buscar prova..."
             value={(table.getColumn("nome")?.getFilterValue() as string) ?? ""}
             onChange={(e) => table.getColumn("nome")?.setFilterValue(e.target.value)}
-            className="max-w-sm border-read-ink bg-read-ink text-read-white placeholder:text-read-gray"
+            className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
           />
-          <span className="text-sm text-read-gray">
-            {table.getFilteredRowModel().rows.length} prova(s)
-          </span>
         </div>
         {onCreated && <CreateExamDialog onCreated={onCreated} />}
       </div>

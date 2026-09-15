@@ -111,7 +111,7 @@ export default function AguardandoPage() {
           localStorage.removeItem("pending_aplicador_provaId")
         }
         if (interval) clearInterval(interval)
-        router.replace("/manage")
+        router.replace(`/manage/aplicar/${sProva}`)
       } else if (currentStatus === "REJEITADO") {
         if (interval) clearInterval(interval)
         localStorage.removeItem("pending_aplicador_nome")
@@ -191,7 +191,7 @@ export default function AguardandoPage() {
           <CardDescription className="text-read-white">Você já pode acessar o painel.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => router.push("/manage")} className="w-full bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white">
+          <Button onClick={() => router.push(provaId ? `/manage/aplicar/${provaId}` : "/manage")} className="w-full bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white">
             Ir para o painel
           </Button>
         </CardContent>

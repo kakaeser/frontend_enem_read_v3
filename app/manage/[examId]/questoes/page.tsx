@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { Plus, RefreshCw } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Accordion } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -132,22 +132,6 @@ export default function QuestoesPage() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     return Array.isArray(data) ? data : []
-  }
-
-  async function fetchQuestions() {
-    setLoading(true)
-    setError(null)
-    setFeedback({})
-    try {
-      const data = await requestQuestions()
-      setDrafts(data.map(toDraft))
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return
-      setError("Não foi possível carregar as questões.")
-      setDrafts([])
-    } finally {
-      setLoading(false)
-    }
   }
 
   useEffect(() => {
@@ -435,15 +419,6 @@ export default function QuestoesPage() {
             className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white disabled:opacity-50"
           >
             {savingAll ? "Salvando…" : "Salvar todas"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchQuestions}
-            className="h-8 w-8 text-read-gray hover:bg-read-ink hover:text-read-green"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="sr-only">Recarregar</span>
           </Button>
         </div>
       </div>

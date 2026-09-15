@@ -90,7 +90,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 <FieldLabel htmlFor="email" className="text-read-white">
                   Email
                 </FieldLabel>
-                <Input id="email" type="email" placeholder="adm@read.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
+                <Input id="email" type="email" placeholder="example@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
               </Field>
               <Field>
                 <div className="flex items-center">
@@ -101,7 +101,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                     Esqueceu a senha?
                   </a>
                 </div>
-                <Input id="password" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
+                <Input id="password" type="password" placeholder="example" value={senha} onChange={(e) => setSenha(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
               </Field>
               {msg && <p className={`text-sm ${msg.type === "error" ? "text-red-400" : "text-read-green"}`}>{msg.text}</p>}
               <Field>
