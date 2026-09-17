@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ChevronRight, Search } from "lucide-react"
+import { AplicarTabs } from "@/components/aplicar-tabs"
 import { Badge } from "@/components/ui/badge"
 import { authFetch } from "@/lib/auth-fetch"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
@@ -63,6 +64,8 @@ export default function AplicarListPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <AplicarTabs />
+
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold text-read-white">Corrigir</h1>
         {!loading && (

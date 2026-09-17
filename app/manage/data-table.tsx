@@ -13,9 +13,10 @@ interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
   onCreated?: () => void
+  rowHref?: (row: TData) => string
 }
 
-export function DataTable<TData extends RowData>({ columns, data, onCreated }: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({ columns, data, onCreated, rowHref }: DataTableProps<TData>) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -63,7 +64,7 @@ export function DataTable<TData extends RowData>({ columns, data, onCreated }: D
                   key={row.id}
                   onClick={() => {
                     const exam = row.original as { id: number }
-                    router.push(`/manage/${exam.id}`)
+                    router.push(rowHref ? rowHref(row.original) : `/manage/${exam.id}`)
                   }}
                   className="cursor-pointer hover:bg-read-ink border-read-ink/50"
                 >

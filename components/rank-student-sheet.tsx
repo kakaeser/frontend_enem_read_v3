@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -11,39 +11,45 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { authFetch } from "@/lib/auth-fetch"
+import { formatTotal } from "@/lib/format"
 import type { RankingEntry } from "@/lib/ranking-types"
 
 const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 type DetailQuestao = {
   numero: number
+  enunciado: string
+  alternativas: { letra: string; texto: string }[]
   correctAnswer: string
   marcada: string
   acertou: boolean
   peso: number
 }
 
-type Detail = {
-  participant: { id: number; nome: string; presenca: boolean }
+export type StudentDetail = {
+  participant: { id: number; nome: string; presenca?: boolean }
   notas: { ponderada: number; redacao: number | null; total: number }
   questoes: DetailQuestao[]
 }
 
-export function formatTotal(e: Pick<RankingEntry, "respondidas" | "redacao" | "total">): string {
-  if (e.respondidas === 0 && e.redacao == null) return "—"
-  return e.total.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-}
+type Detail = StudentDetail
 
 export function RankStudentSheet({
   examId,
   entry,
   onClose,
   onSaved,
+  editable = true,
+  expandableQuestions = false,
+  fetchDetail,
 }: {
   examId: string
   entry: RankingEntry | null
   onClose: () => void
   onSaved: () => void
+  editable?: boolean
+  expandableQuestions?: boolean
+  fetchDetail?: (participantId: number, signal?: AbortSignal) => Promise<Detail>
 }) {
   const [detail, setDetail] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -52,6 +58,7 @@ export function RankStudentSheet({
   const [error, setError] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [expandedQ, setExpandedQ] = useState<number | null>(null)
 
   function handleOpenChange(open: boolean) {
     if (!open) onClose()
@@ -61,19 +68,24 @@ export function RankStudentSheet({
   useEffect(() => {
     if (entryId === null) return
     const controller = new AbortController()
-    async function initialLoad() {
+    async function initialLoad(id: number) {
       setLoading(true)
       setError(null)
       setDetail(null)
       setSavedFlash(false)
+      setExpandedQ(null)
       try {
-        const res = await authFetch(
-          base,
-          `${base}/exams/${examId}/results/${entryId}`,
-          { signal: controller.signal }
-        )
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: Detail = await res.json()
+        const data = fetchDetail
+          ? await fetchDetail(id, controller.signal)
+          : await (async () => {
+              const res = await authFetch(
+                base,
+                `${base}/exams/${examId}/results/${id}`,
+                { signal: controller.signal }
+              )
+              if (!res.ok) throw new Error(`HTTP ${res.status}`)
+              return (await res.json()) as Detail
+            })()
         setDetail(data)
         setRedacao(data.notas.redacao != null ? String(data.notas.redacao) : "")
       } catch (e) {
@@ -84,9 +96,9 @@ export function RankStudentSheet({
         setLoading(false)
       }
     }
-    void initialLoad()
+    void initialLoad(entryId)
     return () => controller.abort()
-  }, [entryId, examId, reloadKey])
+  }, [entryId, examId, reloadKey, fetchDetail])
 
   async function saveRedacao() {
     if (!entry) return
@@ -171,6 +183,7 @@ export function RankStudentSheet({
                 ))}
               </div>
 
+              {editable && (
               <div className="flex flex-col gap-2">
                 <label
                   htmlFor="redacao-nota"
@@ -204,6 +217,7 @@ export function RankStudentSheet({
                   )}
                 </div>
               </div>
+              )}
 
               <div className="flex flex-col gap-2.5">
                 <span className="text-xs font-medium text-read-gray">
@@ -226,24 +240,74 @@ export function RankStudentSheet({
                       </thead>
                       <tbody className="divide-y divide-read-ink">
                         {detail.questoes.map((q) => (
-                          <tr key={q.numero}>
-                            <td className="px-3 py-2 font-bold text-read-white tabular-nums">
-                              {q.numero}
-                            </td>
-                            <td className="px-2 py-2 text-center text-read-gray tabular-nums">
-                              {q.peso}
-                            </td>
-                            <td className="px-2 py-2 text-center font-bold text-read-green tabular-nums">
-                              {q.correctAnswer}
-                            </td>
-                            <td
-                              className={`px-3 py-2 text-center font-bold tabular-nums ${
-                                q.acertou ? "text-read-green" : "text-red-400"
-                              }`}
+                          <Fragment key={q.numero}>
+                            <tr
+                              onClick={
+                                expandableQuestions
+                                  ? () =>
+                                      setExpandedQ((prev) =>
+                                        prev === q.numero ? null : q.numero
+                                      )
+                                  : undefined
+                              }
+                              className={
+                                expandableQuestions
+                                  ? "cursor-pointer transition-colors hover:bg-read-ink/40"
+                                  : undefined
+                              }
                             >
-                              {q.marcada}
-                            </td>
-                          </tr>
+                              <td className="px-3 py-2 font-bold text-read-white tabular-nums">
+                                {q.numero}
+                              </td>
+                              <td className="px-2 py-2 text-center text-read-gray tabular-nums">
+                                {q.peso}
+                              </td>
+                              <td className="px-2 py-2 text-center font-bold text-read-green tabular-nums">
+                                {q.correctAnswer}
+                              </td>
+                              <td
+                                className={`px-3 py-2 text-center font-bold tabular-nums ${
+                                  q.acertou ? "text-read-green" : "text-red-400"
+                                }`}
+                              >
+                                {q.marcada}
+                              </td>
+                            </tr>
+                            {expandableQuestions && expandedQ === q.numero && (
+                              <tr>
+                                <td colSpan={4} className="bg-read-darkest/60 px-3 py-3">
+                                  <p className="whitespace-pre-wrap text-sm text-read-white">
+                                    {q.enunciado || (
+                                      <span className="italic text-read-gray">
+                                        Sem enunciado.
+                                      </span>
+                                    )}
+                                  </p>
+                                  <ul className="mt-2 flex flex-col gap-1.5">
+                                    {(q.alternativas ?? []).map((a) => (
+                                      <li
+                                        key={a.letra}
+                                        className={`rounded-md border px-3 py-1.5 text-sm ${
+                                          a.letra === q.correctAnswer
+                                            ? "border-read-green bg-read-green/10 text-read-white"
+                                            : a.letra === q.marcada
+                                              ? "border-red-500/60 bg-red-500/10 text-read-white"
+                                              : "border-read-ink bg-read-darkest text-read-gray"
+                                        }`}
+                                      >
+                                        <span className="mr-2 font-bold">
+                                          {a.letra})
+                                        </span>
+                                        {a.texto || (
+                                          <span className="italic">sem texto</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>

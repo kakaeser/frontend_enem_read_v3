@@ -13,15 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { RankStudentSheet, formatTotal } from "@/components/rank-student-sheet"
+import { RankStudentSheet } from "@/components/rank-student-sheet"
+import { EditExamDialog } from "@/components/edit-exam-dialog"
 import { authFetch } from "@/lib/auth-fetch"
+import { formatNum, formatTotal } from "@/lib/format"
 import type { RankingEntry, RankingResponse } from "@/lib/ranking-types"
 
 const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-
-function formatNum(v: number): string {
-  return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-}
 
 export default function RankingPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -128,6 +126,9 @@ export default function RankingPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold text-read-white">Ranking</h1>
         <div className="ml-auto flex items-center gap-2">
+          {!loading && (
+            <EditExamDialog examId={examId} onSaved={fetchRanking} />
+          )}
           <Button
             variant="ghost"
             size="sm"
