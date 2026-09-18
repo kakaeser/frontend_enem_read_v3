@@ -161,7 +161,7 @@ export function RankStudentSheet({
 
           {detail && (
             <>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {[
                   { label: "Ponderada", value: detail.notas.ponderada },
                   { label: "Redação", value: detail.notas.redacao },
@@ -181,6 +181,13 @@ export function RankStudentSheet({
                     </div>
                   </div>
                 ))}
+                <div className="rounded-lg border border-read-ink bg-read-darkest px-2 py-2.5 text-center">
+                  <div className="text-[11px] text-read-gray">Acertos</div>
+                  <div className="text-sm font-bold text-read-white tabular-nums">
+                    {detail.questoes.filter((q) => q.acertou).length}/
+                    {entry?.totalQuestoes ?? detail.questoes.length}
+                  </div>
+                </div>
               </div>
 
               {editable && (

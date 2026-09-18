@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +16,7 @@ import {
 import { RankStudentSheet } from "@/components/rank-student-sheet"
 import { EditExamDialog } from "@/components/edit-exam-dialog"
 import { authFetch } from "@/lib/auth-fetch"
+import { downloadRankingExcel } from "@/lib/export-ranking"
 import { formatNum, formatTotal } from "@/lib/format"
 import type { RankingEntry, RankingResponse } from "@/lib/ranking-types"
 
@@ -99,6 +100,13 @@ export default function RankingPage() {
       }
       setConfirmMode(null)
       await fetchRanking()
+      if (next === "completed" && ranking.length > 0) {
+        try {
+          downloadRankingExcel(ranking, exam?.nome ?? `Prova #${examId}`)
+        } catch {
+          setActionError("Prova encerrada, mas o download do Excel falhou.")
+        }
+      }
     } catch (e) {
       setActionError(
         e instanceof Error ? `Erro ao atualizar: ${e.message}` : "Erro ao atualizar."
@@ -129,6 +137,16 @@ export default function RankingPage() {
           {!loading && (
             <EditExamDialog examId={examId} onSaved={fetchRanking} />
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={fetchRanking}
+            disabled={loading}
+            className="h-8 w-8 text-read-gray hover:bg-read-ink hover:text-read-green disabled:opacity-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="sr-only">Recarregar rank</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"

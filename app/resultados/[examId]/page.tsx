@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
 import { useParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { RankStudentSheet, type StudentDetail } from "@/components/rank-student-sheet"

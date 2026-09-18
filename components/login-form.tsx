@@ -40,7 +40,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     const token = localStorage.getItem("access_token")
     if (!token || !isTokenValid(token)) return
     const payload = decodePayload(token)
-    if (payload?.type === "aplicador") router.replace("login/aplicador/aguardando")
+    if (payload?.type === "aplicador") router.replace("/aguardando")
     else router.replace("/manage")
   }, [router])
 
