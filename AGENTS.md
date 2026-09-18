@@ -85,7 +85,7 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 
 ## Infra / Deploy
 
-- Frontend → **Cloudflare Pages**.
+- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com o backend via HTTPS (`NEXT_PUBLIC_API_URL`).
 - Backend → **Google Cloud Run** (`PORT` injetado, `Dockerfile` + `gcloud run deploy`; não usar `nest deploy`/`mau`).
 - DB → **Supabase Postgres** — requer `DATABASE_URL` (pooler `:6543?pgbouncer=true`) + `DIRECT_URL` (`:5432`) no `.env` (gitignored). Ver `prisma.config.ts:1` e `.env.example` no backend.
 
