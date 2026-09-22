@@ -7,6 +7,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from 
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import z from "zod"
 
 function decodePayload(token: string): { exp?: number; type?: string } | null {
@@ -85,6 +86,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold text-read-white">ENEM da READ</h1>
                 <p className="text-balance text-sm text-read-gray">Entre com seu email e senha de ADM</p>
+                <p className="text-balance text-sm text-read-blue">* Login é apenas para os organizadores do evento!</p>
               </div>
               <Field>
                 <FieldLabel htmlFor="email" className="text-read-white">
@@ -123,7 +125,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center text-read-gray">
-        Ao continuar, você concorda com os <a href="#" className="underline text-read-blue-light">Termos</a> e <a href="#" className="underline text-read-blue-light">Privacidade</a>.
+        Ao continuar, você concorda com os{" "}
+        <Link href="/termos" className="underline text-read-blue-light hover:text-read-green">
+          Termos
+        </Link>{" "}
+        e{" "}
+        <Link href="/privacidade" className="underline text-read-blue-light hover:text-read-green">
+          Privacidade
+        </Link>
+        .
       </FieldDescription>
     </div>
   )

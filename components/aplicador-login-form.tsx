@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -57,7 +58,7 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
     }
     setLoading(true)
     try {
-      let res = await fetch(`${base}/auth/aplicador`, {
+      const res = await fetch(`${base}/auth/aplicador`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome: nome.trim(), provaId: Number(provaId) }),
@@ -154,6 +155,17 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
           </div>
         </CardContent>
       </Card>
+      <FieldDescription className="px-6 text-center text-read-gray">
+        Ao continuar, você concorda com os{" "}
+        <Link href="/termos" className="underline text-read-blue-light hover:text-read-green">
+          Termos
+        </Link>{" "}
+        e{" "}
+        <Link href="/privacidade" className="underline text-read-blue-light hover:text-read-green">
+          Privacidade
+        </Link>
+        .
+      </FieldDescription>
     </div>
   )
 }

@@ -88,6 +88,14 @@ export default function Home() {
       <footer className="border-t border-read-ink px-6 py-6 text-center text-sm text-read-gray">
         Rede de Adolescentes — Oitava Igreja Presbiteriana de Belo Horizonte
         {" • "}
+        <Link href="/termos" className="text-read-blue-light hover:text-read-green hover:underline">
+          Termos
+        </Link>
+        {" · "}
+        <Link href="/privacidade" className="text-read-blue-light hover:text-read-green hover:underline">
+          Privacidade
+        </Link>
+        {" • "}
         {new Date().getFullYear()}
       </footer>
     </div>
