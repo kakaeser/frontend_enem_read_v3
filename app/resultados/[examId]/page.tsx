@@ -1,63 +1,24 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { Search } from "lucide-react"
-import { RankStudentSheet, type StudentDetail } from "@/components/rank-student-sheet"
+import { RankStudentSheet } from "@/components/rank-student-sheet"
 import { formatTotal } from "@/lib/format"
-import type { RankingEntry, RankingResponse } from "@/lib/ranking-types"
+import type { RankingEntry } from "@/lib/ranking-types"
 import Header_menu from "@/components/header_landing"
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
+import { useExamRanking, ResultadosBlockError } from "@/hooks/use-exam-ranking"
 
 export default function ResultadoExamPage() {
   const { examId } = useParams<{ examId: string }>()
-  const [ranking, setRanking] = useState<RankingEntry[]>([])
-  const [examNome, setExamNome] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [blocked, setBlocked] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const {data, isLoading, isError, error} = useExamRanking(examId)
   const [selected, setSelected] = useState<RankingEntry | null>(null)
   const [search, setSearch] = useState("")
 
-  useEffect(() => {
-    const controller = new AbortController()
-    async function load() {
-      try {
-        const res = await fetch(`${base}/resultados/${examId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        })
-        if (res.status === 403) {
-          setBlocked(true)
-          return
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: RankingResponse = await res.json()
-        setRanking(Array.isArray(data.ranking) ? data.ranking : [])
-        setExamNome(data.exam?.nome ?? null)
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar o ranking.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [examId])
-
-  const fetchDetail = useCallback(
-    async (participantId: number, signal?: AbortSignal): Promise<StudentDetail> => {
-      const res = await fetch(
-        `${base}/resultados/${examId}/${participantId}`,
-        { cache: "no-store", signal }
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    },
-    [examId]
-  )
+  const blocked = error instanceof ResultadosBlockError
+  const ranking = Array.isArray(data?.ranking) ? data.ranking : []
+  const examNome = data?.exam?.nome ?? null
+  const loadError = isError && !blocked
 
   return (
     <div className="flex min-h-svh flex-col bg-read-darkest text-read-white">
@@ -67,7 +28,7 @@ export default function ResultadoExamPage() {
           {examNome ?? `Prova #${examId}`}
         </h1>
 
-        {!loading && !blocked && !error && ranking.length > 0 && (
+        {!isLoading && !blocked && !error && ranking.length > 0 && (
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
             <input
@@ -79,27 +40,29 @@ export default function ResultadoExamPage() {
           </div>
         )}
 
-        {loading && (
+        {isLoading && (
           <p className="text-sm text-read-gray">Carregando ranking…</p>
         )}
 
-        {!loading && blocked && (
+        {!isLoading && blocked && (
           <p className="text-sm text-read-gray">
             Resultados disponíveis 2 dias após o encerramento.
           </p>
         )}
 
-        {!loading && !blocked && error && (
-          <p className="text-sm text-red-400">{error}</p>
+        {loadError && (
+          <p className="text-sm text-red-400">
+            Não foi possível carregar o ranking.
+          </p>
         )}
 
-        {!loading && !blocked && !error && ranking.length === 0 && (
+        {!isLoading && !blocked && !error && ranking.length === 0 && (
           <p className="text-sm text-read-gray">
             Nenhum participante neste ranking.
           </p>
         )}
 
-        {!loading && !blocked && !error && ranking.length > 0 && (() => {
+        {!isLoading && !blocked && !error && ranking.length > 0 && (() => {
           const visible = ranking.filter((r) =>
             r.nome.toLowerCase().includes(search.trim().toLowerCase())
           )
@@ -151,7 +114,7 @@ export default function ResultadoExamPage() {
           onSaved={() => {}}
           editable={false}
           expandableQuestions
-          fetchDetail={fetchDetail}
+          detailSource="public"
         />
       </main>
     </div>
