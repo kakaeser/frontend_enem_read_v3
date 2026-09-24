@@ -41,6 +41,29 @@ export const questionsBulkSchema = z.object({
 
 export type QuestionBulkPayload = z.infer<typeof questionBulkItemSchema>
 
+/** Estado de edição local (RHF) — inclui `id` negativo para rascunhos e flag `dirty`. */
+export const questionFormItemSchema = z.object({
+  id: z.number().int(),
+  numero: z.number().int().min(1),
+  enunciado: z.string(),
+  alternativas: z.array(
+    z.object({
+      letra: z.string(),
+      texto: z.string(),
+    })
+  ),
+  correctAnswer: z.string(),
+  peso: z.number().int().min(1),
+  dirty: z.boolean(),
+})
+
+export const questionsFormSchema = z.object({
+  questions: z.array(questionFormItemSchema),
+})
+
+export type QuestionFormItem = z.infer<typeof questionFormItemSchema>
+export type QuestionsFormValues = z.infer<typeof questionsFormSchema>
+
 type ValidationOk = { data: QuestionBulkPayload[] }
 type ValidationFail = { errors: Map<number, string> }
 

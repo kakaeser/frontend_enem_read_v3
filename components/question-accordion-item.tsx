@@ -1,6 +1,7 @@
 "use client"
 
 import { Check, Trash2 } from "lucide-react"
+import { useFormContext } from "react-hook-form"
 import {
   AccordionContent,
   AccordionItem,
@@ -9,11 +10,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import type { QuestionsFormValues } from "@/lib/question-schema"
 
 export const LETRAS = ["A", "B", "C", "D"] as const
 
 export type AlternativaDraft = { letra: string; texto: string }
 
+/** @deprecated use QuestionFormItem from lib/question-schema */
 export type QuestionDraft = {
   id: number
   numero: number
@@ -42,8 +45,13 @@ export function normalizeAlternativas(
   })
 }
 
-export function isIncompleta(d: Pick<QuestionDraft, "enunciado" | "correctAnswer">) {
-  return !d.enunciado || !LETRAS.includes(d.correctAnswer as (typeof LETRAS)[number])
+export function isIncompleta(
+  d: Pick<QuestionDraft, "enunciado" | "correctAnswer">
+) {
+  return (
+    !d.enunciado ||
+    !LETRAS.includes(d.correctAnswer as (typeof LETRAS)[number])
+  )
 }
 
 export type QuestionFeedback = {
@@ -52,24 +60,38 @@ export type QuestionFeedback = {
 }
 
 type Props = {
-  draft: QuestionDraft
+  index: number
   saving: boolean
   deleting: boolean
   feedback?: QuestionFeedback | null
-  onPatch: (patch: Partial<QuestionDraft>) => void
   onSave: () => void
   onDelete: () => void
 }
 
-export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPatch, onSave, onDelete }: Props) {
-  const incompleta = isIncompleta(draft)
+export function QuestionAccordionItem({
+  index,
+  saving,
+  deleting,
+  feedback,
+  onSave,
+  onDelete,
+}: Props) {
+  const { register, setValue, watch } = useFormContext<QuestionsFormValues>()
+  const draft = watch(`questions.${index}`)
+  if (!draft) return null
 
-  function setAlternativaTexto(letra: string, texto: string) {
-    onPatch({
-      alternativas: draft.alternativas.map((a) =>
-        a.letra === letra ? { ...a, texto } : a
-      ),
+  const incompleta = isIncompleta(draft)
+  const base = `questions.${index}` as const
+
+  function markDirty() {
+    setValue(`${base}.dirty`, true, { shouldDirty: true })
+  }
+
+  function setAlternativaTexto(altIndex: number, texto: string) {
+    setValue(`${base}.alternativas.${altIndex}.texto`, texto, {
+      shouldDirty: true,
     })
+    markDirty()
   }
 
   return (
@@ -109,11 +131,12 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
             </label>
             <textarea
               id={`enunciado-${draft.id}`}
-              value={draft.enunciado}
-              onChange={(e) => onPatch({ enunciado: e.target.value })}
               rows={4}
               placeholder="Digite o enunciado da questão…"
               className="min-h-24 w-full rounded-lg border border-read-ink bg-read-darkest px-3 py-2 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
+              {...register(`${base}.enunciado`, {
+                onChange: () => markDirty(),
+              })}
             />
           </div>
 
@@ -121,7 +144,7 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
             <span className="text-xs font-medium text-read-gray">
               Alternativas
             </span>
-            {draft.alternativas.map((a) => (
+            {draft.alternativas.map((a, altIndex) => (
               <div key={a.letra} className="flex items-center gap-2">
                 <span
                   className={`w-6 shrink-0 text-center text-sm font-bold ${
@@ -134,7 +157,7 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
                 </span>
                 <Input
                   value={a.texto}
-                  onChange={(e) => setAlternativaTexto(a.letra, e.target.value)}
+                  onChange={(e) => setAlternativaTexto(altIndex, e.target.value)}
                   placeholder={`Texto da alternativa ${a.letra}…`}
                   className="border-read-ink bg-read-darkest text-sm text-read-white placeholder:text-read-gray/60 focus-visible:border-read-green"
                 />
@@ -152,9 +175,10 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
               </label>
               <select
                 id={`gabarito-${draft.id}`}
-                value={draft.correctAnswer}
-                onChange={(e) => onPatch({ correctAnswer: e.target.value })}
                 className="h-8 rounded-lg border border-read-ink bg-read-darkest px-2.5 text-sm text-read-white focus:border-read-green focus:outline-none"
+                {...register(`${base}.correctAnswer`, {
+                  onChange: () => markDirty(),
+                })}
               >
                 {LETRAS.map((l) => (
                   <option key={l} value={l}>
@@ -175,12 +199,19 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
                 type="number"
                 min={1}
                 step={1}
-                value={draft.peso}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  onPatch({ peso: Number.isNaN(v) ? 1 : Math.max(1, v) })
-                }}
                 className="w-24 border-read-ink bg-read-darkest text-sm text-read-white focus-visible:border-read-green"
+                {...register(`${base}.peso`, {
+                  valueAsNumber: true,
+                  onChange: (e) => {
+                    const v = parseInt(e.target.value, 10)
+                    setValue(
+                      `${base}.peso`,
+                      Number.isNaN(v) ? 1 : Math.max(1, v),
+                      { shouldDirty: true }
+                    )
+                    markDirty()
+                  },
+                })}
               />
             </div>
             <div className="ml-auto flex items-center gap-3">
@@ -190,11 +221,14 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
                     feedback.kind === "error" ? "text-red-400" : "text-read-green"
                   }`}
                 >
-                  {feedback.kind === "success" && <Check className="h-3.5 w-3.5" />}
+                  {feedback.kind === "success" && (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
                   {feedback.message}
                 </p>
               )}
               <Button
+                type="button"
                 onClick={onSave}
                 disabled={!draft.dirty || saving || deleting}
                 className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white disabled:opacity-50"
@@ -202,6 +236,7 @@ export function QuestionAccordionItem({ draft, saving, deleting, feedback, onPat
                 {saving ? "Salvando…" : "Salvar questão"}
               </Button>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 onClick={onDelete}
