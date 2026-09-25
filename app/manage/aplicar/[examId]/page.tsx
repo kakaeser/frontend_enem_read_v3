@@ -6,7 +6,7 @@ import { useParams } from "next/navigation"
 import { ChevronRight, Search } from "lucide-react"
 import { AplicarTabs } from "@/components/aplicar-tabs"
 import { Badge } from "@/components/ui/badge"
-import { authFetch } from "@/lib/auth-fetch"
+import { authAxiosRequest } from "@/lib/api"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
 
 type Presente = {
@@ -14,8 +14,6 @@ type Presente = {
   nome: string
   _count: { answers: number }
 }
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 export default function AplicarListPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -31,18 +29,16 @@ export default function AplicarListPage() {
     const controller = new AbortController()
     async function load() {
       try {
-        const [resP, resQ] = await Promise.all([
-          authFetch(base, `${base}/exams/${examId}/participants/presentes`, {
-            signal: controller.signal,
-          }),
-          fetch(`${base}/exams/${examId}/questions`, {
-            cache: "no-store",
+        const [dataP, dataQ] = await Promise.all([
+          authAxiosRequest<Presente[]>(
+            "GET",
+            `/exams/${examId}/participants/presentes`,
+            { signal: controller.signal }
+          ),
+          authAxiosRequest<unknown[]>("GET", `/exams/${examId}/questions`, {
             signal: controller.signal,
           }),
         ])
-        if (!resP.ok) throw new Error(`HTTP ${resP.status}`)
-        if (!resQ.ok) throw new Error(`HTTP ${resQ.status}`)
-        const [dataP, dataQ] = await Promise.all([resP.json(), resQ.json()])
         setPresentes(Array.isArray(dataP) ? dataP : [])
         setTotalQuestoes(Array.isArray(dataQ) ? dataQ.length : 0)
       } catch (e) {

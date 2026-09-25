@@ -3,24 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { logoutSession } from "@/lib/api";
 
 export default function Header_menu() {
   const router = useRouter();
 
   async function handleLogout() {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030";
-    const refresh = localStorage.getItem("refresh_token");
-    try {
-      if (refresh) {
-        await fetch(`${base}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refresh }),
-        });
-      }
-    } catch {}
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    await logoutSession();
     router.replace("/login");
   }
   return (

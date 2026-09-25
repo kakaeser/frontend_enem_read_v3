@@ -1,9 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import axios from "axios"
-import { authAxiosRequest } from "@/lib/auth-axios"
+import { authAxiosRequest } from "@/lib/api"
 import type { QuestionBulkPayload } from "@/lib/question-schema"
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 export type ExamQuestion = {
   id: number
@@ -22,13 +19,11 @@ export async function getExamQuestions(
   examId: string,
   signal?: AbortSignal
 ): Promise<ExamQuestion[]> {
-  const { data, status } = await axios.get<ExamQuestion[]>(
-    `${base}/exams/${examId}/questions`,
-    { signal, validateStatus: (s) => s < 500 }
+  const data = await authAxiosRequest<ExamQuestion[]>(
+    "GET",
+    `/exams/${examId}/questions`,
+    { signal }
   )
-  if (status < 200 || status >= 300) {
-    throw new Error("Não foi possível carregar as questões.")
-  }
   return Array.isArray(data) ? data : []
 }
 

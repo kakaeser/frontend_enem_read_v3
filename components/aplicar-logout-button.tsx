@@ -3,24 +3,13 @@
 import { useRouter } from "next/navigation"
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { logoutSession } from "@/lib/api"
 
 export function AplicarLogoutButton() {
   const router = useRouter()
 
   async function handleLogout() {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-    const refresh = localStorage.getItem("refresh_token")
-    try {
-      if (refresh) {
-        await fetch(`${base}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refresh }),
-        })
-      }
-    } catch {}
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
+    await logoutSession()
     router.replace("/login")
   }
 

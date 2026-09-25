@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { publicAxiosRequest } from "@/lib/api"
 
 export default async function ManageExamLayout({
   children,
@@ -11,13 +12,14 @@ export default async function ManageExamLayout({
   const { examId } = await params
   let examNome: string | null = null
   try {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-    const res = await fetch(`${base}/exams/${examId}`, { cache: "no-store" })
-    if (res.ok) {
-      const data = await res.json()
-      examNome = data.nome ?? null
-    }
-  } catch {}
+    const data = await publicAxiosRequest<{ nome?: string }>(
+      "GET",
+      `/exams/${examId}`
+    )
+    examNome = data.nome ?? null
+  } catch {
+    /* ignore */
+  }
   return (
     <SidebarProvider
       style={

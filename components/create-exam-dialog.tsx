@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { authAxiosRequest } from "@/lib/api"
 
 export function CreateExamDialog({ onCreated }: { onCreated?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -23,20 +24,9 @@ export function CreateExamDialog({ onCreated }: { onCreated?: () => void }) {
     }
     setLoading(true)
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-      const token = localStorage.getItem("access_token")
-      const res = await fetch(`${base}/exams`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ nome: nome.trim(), qtdQuestoes, notaSimbolica }),
+      await authAxiosRequest("POST", "/exams", {
+        data: { nome: nome.trim(), qtdQuestoes, notaSimbolica },
       })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.message ?? "Erro ao criar prova")
-      }
       setOpen(false)
       setNome("")
       onCreated?.()

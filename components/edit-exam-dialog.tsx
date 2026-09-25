@@ -14,10 +14,15 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { authFetch } from "@/lib/auth-fetch"
+import { authAxiosRequest } from "@/lib/api"
 import { examSchema } from "@/lib/exam-schema"
 
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
+type ExamDetailResponse = {
+  nome?: string
+  notaSimbolica?: number
+  questions?: unknown[]
+  _count?: { questions?: number; participants?: number }
+}
 
 export function EditExamDialog({
   examId,
@@ -47,11 +52,11 @@ export function EditExamDialog({
       setLoadingData(true)
       setError(null)
       try {
-        const res = await authFetch(base, `${base}/exams/${examId}`, {
-          signal: controller.signal,
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
+        const data = await authAxiosRequest<ExamDetailResponse>(
+          "GET",
+          `/exams/${examId}`,
+          { signal: controller.signal }
+        )
         setNome(data.nome ?? "")
         setNota(data.notaSimbolica ?? 1000)
         setCounts({
@@ -87,14 +92,9 @@ export function EditExamDialog({
     }
     setLoading(true)
     try {
-      const res = await authFetch(base, `${base}/exams/${examId}`, {
-        method: "PATCH",
-        body: JSON.stringify(parsed.data),
+      await authAxiosRequest("PATCH", `/exams/${examId}`, {
+        data: parsed.data,
       })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.message ?? "Erro ao salvar prova")
-      }
       setOpen(false)
       onSaved?.()
     } catch (err) {
@@ -108,13 +108,7 @@ export function EditExamDialog({
     setDeleting(true)
     setError(null)
     try {
-      const res = await authFetch(base, `${base}/exams/${examId}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.message ?? "Erro ao excluir prova")
-      }
+      await authAxiosRequest("DELETE", `/exams/${examId}`)
       router.push("/manage")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro")

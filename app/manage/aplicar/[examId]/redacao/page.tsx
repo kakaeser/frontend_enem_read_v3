@@ -7,7 +7,7 @@ import { AplicarTabs } from "@/components/aplicar-tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { authFetch } from "@/lib/auth-fetch"
+import { authAxiosRequest } from "@/lib/api"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
 
 type Presente = {
@@ -15,8 +15,6 @@ type Presente = {
   nome: string
   redacaoNota: number | null
 }
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 export default function RedacaoPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -35,13 +33,11 @@ export default function RedacaoPage() {
     const controller = new AbortController()
     async function load() {
       try {
-        const res = await authFetch(
-          base,
-          `${base}/exams/${examId}/participants/presentes`,
+        const data = await authAxiosRequest<Presente[]>(
+          "GET",
+          `/exams/${examId}/participants/presentes`,
           { signal: controller.signal }
         )
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
         setPresentes(Array.isArray(data) ? data : [])
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return
@@ -80,15 +76,11 @@ export default function RedacaoPage() {
       return next
     })
     try {
-      const res = await authFetch(
-        base,
-        `${base}/exams/${examId}/participants/${p.id}/redacao`,
-        { method: "PATCH", body: JSON.stringify({ redacaoNota: value }) }
+      await authAxiosRequest(
+        "PATCH",
+        `/exams/${examId}/participants/${p.id}/redacao`,
+        { data: { redacaoNota: value } }
       )
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.message ?? `HTTP ${res.status}`)
-      }
       setPresentes((prev) =>
         prev.map((x) => (x.id === p.id ? { ...x, redacaoNota: value } : x))
       )

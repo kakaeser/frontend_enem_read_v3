@@ -22,25 +22,23 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { authAxiosRequest, logoutSession } from "@/lib/api"
 
 type Props = { examId: string; examNome?: string | null }
+
+type AplicadorRow = { id: number; nome: string; status: string }
 
 export function AppSidebar({ examId, examNome }: Props) {
   const pathname = usePathname()
   const [openAplicadores, setOpenAplicadores] = useState(false)
-  const [aplicadores, setAplicadores] = useState<{ id: number; nome: string; status: string }[]>([])
-
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
+  const [aplicadores, setAplicadores] = useState<AplicadorRow[]>([])
 
   async function fetchAplicadores() {
-    const token = localStorage.getItem("access_token")
     try {
-      const res = await fetch(`${base}/aplicadores?provaId=${examId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error()
-      const data = await res.json()
+      const data = await authAxiosRequest<AplicadorRow[]>(
+        "GET",
+        `/aplicadores?provaId=${examId}`
+      )
       setAplicadores(Array.isArray(data) ? data : [])
     } catch {
       setAplicadores([])
@@ -50,70 +48,33 @@ export function AppSidebar({ examId, examNome }: Props) {
   useEffect(() => {
     if (!openAplicadores) return
     fetchAplicadores()
-  }, [openAplicadores, base, examId])
+  }, [openAplicadores, examId])
 
   async function handleStatus(id: number, status: "APROVADO" | "REJEITADO") {
-    let token = localStorage.getItem("access_token")
-    if (!token) return
-    let res = await fetch(`${base}/aplicadores/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status }),
-    })
-    if (res.status === 401) {
-      const newToken = await tryRefresh()
-      if (newToken) {
-        token = newToken
-        res = await fetch(`${base}/aplicadores/${id}/status`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ status }),
-        })
-      }
+    try {
+      const updated = await authAxiosRequest<AplicadorRow>(
+        "PATCH",
+        `/aplicadores/${id}/status`,
+        { data: { status } }
+      )
+      setAplicadores((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, ...updated, status: updated.status ?? status }
+            : a
+        )
+      )
+    } catch {
+      /* ignore */
     }
-    if (!res.ok) return
-    const updated = await res.json().catch(() => ({ id, status }))
-    setAplicadores((prev) => prev.map((a) => (a.id === id ? { ...a, ...updated, status: updated.status ?? status } : a)))
   }
 
   const isActive = (href: string) => pathname === href
   const router = useRouter()
 
   async function handleLogout() {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-    const refresh = localStorage.getItem("refresh_token")
-    try {
-      if (refresh) {
-        await fetch(`${base}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refresh }),
-        })
-      }
-    } catch {}
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
+    await logoutSession()
     router.replace("/login")
-  }
-
-  async function tryRefresh(): Promise<string | null> {
-    const refresh = localStorage.getItem("refresh_token")
-    if (!refresh) return null
-    try {
-      const res = await fetch(`${base}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refresh }),
-      })
-      if (!res.ok) return null
-      const data = await res.json()
-      if (data.access_token) {
-        localStorage.setItem("access_token", data.access_token)
-        if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token)
-        return data.access_token
-      }
-    } catch {}
-    return null
   }
 
   return (

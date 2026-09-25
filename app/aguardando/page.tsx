@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { authAxiosRequest, axiosHttp, publicAxiosRequest } from "@/lib/api"
 
 type Status = "PENDENTE" | "APROVADO" | "REJEITADO"
 
@@ -20,8 +21,6 @@ export default function AguardandoPage() {
   const [status, setStatus] = useState<Status | null>(null)
   const [nome, setNome] = useState<string | null>(null)
   const [provaId, setProvaId] = useState<string | null>(null)
-
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
@@ -48,12 +47,10 @@ export default function AguardandoPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return null
       try {
-        const res = await fetch(`${base}/aplicadores/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        })
-        if (!res.ok) throw new Error()
-        const data: { status: Status } = await res.json()
+        const data = await authAxiosRequest<{ status: Status }>(
+          "GET",
+          "/aplicadores/me"
+        )
         return data.status
       } catch {
         return null
@@ -62,9 +59,9 @@ export default function AguardandoPage() {
 
     async function pollPublic() {
       try {
-        const res = await fetch(`${base}/aplicadores?provaId=${sProva}`, { cache: "no-store" })
-        if (!res.ok) throw new Error()
-        const list: { nome: string; status: Status }[] = await res.json()
+        const list = await publicAxiosRequest<
+          { nome: string; status: Status }[]
+        >("GET", `/aplicadores?provaId=${sProva}`)
         const found = list.find((a) => a.nome === sNome)
         return found?.status ?? null
       } catch {
@@ -93,13 +90,13 @@ export default function AguardandoPage() {
 
       if (currentStatus === "APROVADO") {
         if (!token) {
-          const loginRes = await fetch(`${base}/auth/aplicador`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nome: sNome, provaId: Number(sProva) }),
-          })
-          if (loginRes.ok) {
-            const data = await loginRes.json()
+          const loginRes = await axiosHttp<{ access_token?: string }>(
+            "POST",
+            "/auth/aplicador",
+            { data: { nome: sNome, provaId: Number(sProva) } }
+          )
+          if (loginRes.status >= 200 && loginRes.status < 300) {
+            const data = loginRes.data
             if (data.access_token) {
               localStorage.setItem("access_token", data.access_token)
               localStorage.removeItem("pending_aplicador_nome")
@@ -134,7 +131,7 @@ export default function AguardandoPage() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [router, base, status])
+  }, [router, status])
 
   if (status === "PENDENTE") {
     return (

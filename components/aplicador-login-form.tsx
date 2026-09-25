@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { axiosHttp, publicAxiosRequest } from "@/lib/api"
 
 function decodePayload(token: string): { exp?: number; type?: string } | null {
   try {
@@ -31,7 +32,6 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null)
 
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
   const router = useRouter()
 
   useEffect(() => {
@@ -43,11 +43,10 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
   }, [router])
 
   useEffect(() => {
-    fetch(`${base}/exams?status=in_progress`)
-      .then((r) => (r.ok ? r.json() : []))
+    publicAxiosRequest<Exam[]>("GET", "/exams?status=in_progress")
       .then((d) => setExams(Array.isArray(d) ? d : []))
       .catch(() => setExams([]))
-  }, [base])
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -58,35 +57,43 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
     }
     setLoading(true)
     try {
-      const res = await fetch(`${base}/auth/aplicador`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: nome.trim(), provaId: Number(provaId) }),
-      })
+      const res = await axiosHttp<{ access_token?: string; refresh_token?: string; message?: string }>(
+        "POST",
+        "/auth/aplicador",
+        {
+          data: { nome: nome.trim(), provaId: Number(provaId) },
+        }
+      )
       if (res.status === 404) {
-        const c = await fetch(`${base}/aplicadores`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome: nome.trim(), provaId: Number(provaId) }),
+        const c = await axiosHttp("POST", "/aplicadores", {
+          data: { nome: nome.trim(), provaId: Number(provaId) },
         })
-        if (!c.ok) throw new Error("Erro ao solicitar acesso")
+        if (c.status < 200 || c.status >= 300) {
+          throw new Error("Erro ao solicitar acesso")
+        }
         localStorage.setItem("pending_aplicador_nome", nome.trim())
         localStorage.setItem("pending_aplicador_provaId", String(provaId))
         router.replace(`/aguardando?nome=${encodeURIComponent(nome.trim())}&provaId=${provaId}`)
         return
       }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        const msgText = d.message ?? ""
+      if (res.status < 200 || res.status >= 300) {
+        const msgText =
+          typeof res.data === "object" &&
+          res.data !== null &&
+          "message" in res.data &&
+          typeof (res.data as { message: unknown }).message === "string"
+            ? (res.data as { message: string }).message
+            : ""
         if (msgText.includes("PENDENTE")) {
           localStorage.setItem("pending_aplicador_nome", nome.trim())
           localStorage.setItem("pending_aplicador_provaId", String(provaId))
           router.replace(`/aguardando?nome=${encodeURIComponent(nome.trim())}&provaId=${provaId}`)
           return
         }
-        throw new Error(d.message ?? "Acesso pendente ou rejeitado.")
+        throw new Error(msgText || "Acesso pendente ou rejeitado.")
       }
-      const { access_token, refresh_token } = await res.json()
+      const { access_token, refresh_token } = res.data
+      if (!access_token) throw new Error("Resposta de login inválida.")
       localStorage.setItem("access_token", access_token)
       if (refresh_token) localStorage.setItem("refresh_token", refresh_token)
       localStorage.removeItem("pending_aplicador_nome")

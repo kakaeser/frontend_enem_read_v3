@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { authAxiosRequest } from "@/lib/auth-axios"
+import { authAxiosRequest } from "@/lib/api"
 import type { ParticipantPayload } from "@/lib/participant-schema"
 
 export type ExamParticipant = {

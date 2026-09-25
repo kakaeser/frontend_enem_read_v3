@@ -9,6 +9,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import z from "zod"
+import { publicAxiosRequest } from "@/lib/api"
 
 function decodePayload(token: string): { exp?: number; type?: string } | null {
   try {
@@ -34,7 +35,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [loading, setLoading] = useState<boolean>(false)
 
 
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
   const router = useRouter()
 
   useEffect(() => {
@@ -55,16 +55,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     }
     setLoading(true)
     try {
-      const res = await fetch(`${base}/auth/login`,{
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
+      const { access_token, refresh_token } = await publicAxiosRequest<{
+        access_token: string
+        refresh_token?: string
+      }>("POST", "/auth/login", {
+        data: { email, senha },
       })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.message ?? "Erro ao logar.")
-      }
-      const { access_token, refresh_token } = await res.json()
       localStorage.setItem("access_token", access_token)
       if (refresh_token) localStorage.setItem("refresh_token", refresh_token)
       setMsg({ type: "success", text: "Logado!" })

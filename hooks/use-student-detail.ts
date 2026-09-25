@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { StudentDetail } from "@/lib/student-detail"
-import { authAxiosRequest } from "@/lib/auth-axios"
+import { authAxiosRequest } from "@/lib/api"
 import { examRankingQueryKey, getParticipantResult } from "@/hooks/use-exam-ranking"
 
 export type StudentDetailSource = "public" | "admin"

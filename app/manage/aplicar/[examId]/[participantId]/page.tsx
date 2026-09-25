@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { authFetch } from "@/lib/auth-fetch"
+import { authAxiosRequest } from "@/lib/api"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
 
 type Alternativa = { letra: string; texto: string }
@@ -31,8 +31,6 @@ type AnswerRow = { questId: number; alternativa: string }
 type Draft = { marks: Record<number, string>; lastQ: number | null }
 
 const LETRAS = ["A", "B", "C", "D"]
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 function lsKey(examId: string, participantId: string) {
   return `aplicar:${examId}:${participantId}`
@@ -88,32 +86,26 @@ export default function CorretorPage() {
     const controller = new AbortController()
     async function load() {
       try {
-        const [resQ, resA, resP] = await Promise.all([
-          fetch(`${base}/exams/${examId}/questions`, {
-            cache: "no-store",
+        const [qs, as, list] = await Promise.all([
+          authAxiosRequest<Question[]>("GET", `/exams/${examId}/questions`, {
             signal: controller.signal,
           }),
-          authFetch(
-            base,
-            `${base}/exams/${examId}/answers/participant/${participantId}`,
+          authAxiosRequest<AnswerRow[]>(
+            "GET",
+            `/exams/${examId}/answers/participant/${participantId}`,
             { signal: controller.signal }
           ),
-          authFetch(base, `${base}/exams/${examId}/participants/presentes`, {
-            signal: controller.signal,
-          }),
+          authAxiosRequest<{ id: number; nome: string }[]>(
+            "GET",
+            `/exams/${examId}/participants/presentes`,
+            { signal: controller.signal }
+          ).catch(() => [] as { id: number; nome: string }[]),
         ])
-        if (!resQ.ok) throw new Error(`HTTP ${resQ.status}`)
-        if (!resA.ok) throw new Error(`HTTP ${resA.status}`)
-        const qs: Question[] = await resQ.json()
-        const as: AnswerRow[] = resA.ok ? await resA.json() : []
         const serverMarks: Record<number, string> = {}
         for (const a of as) serverMarks[a.questId] = a.alternativa
-        if (resP.ok) {
-          const list: { id: number; nome: string }[] = await resP.json()
-          setStudentName(
-            list.find((p) => p.id === Number(participantId))?.nome ?? null
-          )
-        }
+        setStudentName(
+          list.find((p) => p.id === Number(participantId))?.nome ?? null
+        )
         const draft = readDraft(examId, participantId)
         const merged =
           Object.keys(draft.marks).length > 0
@@ -223,14 +215,9 @@ export default function CorretorPage() {
           questId: q.id,
           alternativa: marks[q.id],
         }))
-      const res = await authFetch(base, `${base}/exams/${examId}/answers/bulk`, {
-        method: "POST",
-        body: JSON.stringify({ answers: payload }),
+      await authAxiosRequest("POST", `/exams/${examId}/answers/bulk`, {
+        data: { answers: payload },
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.message ?? `HTTP ${res.status}`)
-      }
       try {
         localStorage.removeItem(lsKey(examId, participantId))
       } catch {}
