@@ -12,11 +12,10 @@ import { features, type DataTableFeatures } from "./data-table-features"
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
-  onCreated?: () => void
   rowHref?: (row: TData) => string
 }
 
-export function DataTable<TData extends RowData>({ columns, data, onCreated, rowHref }: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({ columns, data, rowHref }: DataTableProps<TData>) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -42,7 +41,7 @@ export function DataTable<TData extends RowData>({ columns, data, onCreated, row
             className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
           />
         </div>
-        {onCreated && <CreateExamDialog onCreated={onCreated} />}
+        <CreateExamDialog />
       </div>
       <div className="overflow-hidden rounded-lg border border-read-green">
         <Table>

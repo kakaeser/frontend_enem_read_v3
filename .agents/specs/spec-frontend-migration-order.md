@@ -25,8 +25,8 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 | Feito | Detalhe aluno (sheet) | `hooks/use-student-detail.ts`, `components/rank-student-sheet.tsx` |
 | Feito | Lista de provas ADM | `hooks/use-exams.ts`, `app/manage/page.tsx` |
 | Feito | HTTP (`lib/api.ts`) | `tryRefresh`, `authAxiosRequest`, `publicAxiosRequest`; `@/lib/auth-axios` reexport deprecated |
-| Parcial | TanStack Query | 8 hooks feitos; ranking ADM (Passo 3) feito; ~9 arquivos ainda `useEffect` + `api` |
-| Pendente | RHF forms, TSQ aplicar/sidebar, polish | ver passos abaixo |
+| Parcial | TanStack Query | 11 hooks; Passos 3–4 feitos; fluxo aplicador (Passo 5) pendente |
+| Pendente | RHF logins, TSQ aplicar/aguardando, polish | ver passos abaixo |
 
 ---
 
@@ -47,13 +47,13 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ## Passo 2 — Lista de provas (`GET /exams`)
 
-**Status:** em grande parte **feito** (`use-exams` + `manage/page`).
+**Status: feito** (`use-exams`, `manage/page`, create via `use-create-exam`).
 
 ### Tarefas restantes
 
-- [ ] `useExams`: tipar `useQuery<Exam[], Error>`; tipo `Exam` de `@/app/manage/columns`
-- [ ] Tratar `isError` na UI (hoje só `isLoading`)
-- [ ] `create-exam-dialog`: mutation `POST /exams` + `invalidateQueries({ queryKey: examsQueryKey })` — remover `onCreated={refetch}` quando invalidação estiver no dialog (Passo 4)
+- [x] `useExams`: tipar `useQuery<Exam[], Error>`; tipo `Exam` de `@/app/manage/columns`
+- [x] Tratar `isError` na UI (hoje só `isLoading`)
+- [x] `create-exam-dialog`: mutation `POST /exams` + `invalidateQueries({ queryKey: examsQueryKey })` — remover `onCreated={refetch}` quando invalidação estiver no dialog (Passo 4)
 
 ### Critério de pronto
 
@@ -92,6 +92,8 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ## Passo 4 — Sidebar, criar e editar prova
 
+**Status: feito** (`use-aplicadores`, `use-create-exam`, `use-exam-detail`, dialogs + sidebar).
+
 **Objetivo:** ADM no layout da prova sem `fetch`/`authFetch` solto.
 
 ### Hooks / mutations sugeridos
@@ -102,10 +104,10 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ### Arquivos
 
-- [ ] `components/app-sidebar.tsx` — lista aplicadores, aprovar/rejeitar, logout (logout pode ficar utilitário em `lib/auth.ts`)
-- [ ] `components/create-exam-dialog.tsx` — mutation + Zod (`lib/exam-schema.ts`) + RHF
-- [ ] `components/edit-exam-dialog.tsx` — Query para carregar + mutations para salvar/excluir
-- [ ] `app/manage/data-table.tsx` — `onCreated` opcional após invalidação global de `examsQueryKey`
+- [x] `components/app-sidebar.tsx` — lista aplicadores, aprovar/rejeitar, logout (logout pode ficar utilitário em `lib/auth.ts`)
+- [x] `components/create-exam-dialog.tsx` — mutation + Zod (`lib/exam-schema.ts`) + RHF
+- [x] `components/edit-exam-dialog.tsx` — Query para carregar + mutations para salvar/excluir
+- [x] `app/manage/data-table.tsx` — `onCreated` opcional após invalidação global de `examsQueryKey`
 
 ### Critério de pronto
 

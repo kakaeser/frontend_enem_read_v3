@@ -72,17 +72,20 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 | `hooks/use-student-detail.ts` | `components/rank-student-sheet.tsx` |
 | `hooks/use-admin-exam-results.ts` | `app/manage/[examId]/page.tsx` |
 | `hooks/use-update-exam-status.ts` | `app/manage/[examId]/page.tsx` (mutation status) |
+| `hooks/use-create-exam.ts` | `components/create-exam-dialog.tsx` |
+| `hooks/use-exam-detail.ts` | `components/edit-exam-dialog.tsx` |
+| `hooks/use-aplicadores.ts` | `components/app-sidebar.tsx` |
 
-**Total:** 8 hooks de domínio com TSQ.
+**Total:** 11 hooks de domínio com TSQ.
 
 ### Sem TSQ (API via `lib/api` + estado manual ou RSC)
 
 | Arquivo | O que faz hoje | Próximo hook sugerido |
 |---------|----------------|------------------------|
 | ~~`app/manage/[examId]/page.tsx`~~ | — | **Feito** — `use-admin-exam-results`, `use-update-exam-status` |
-| `components/create-exam-dialog.tsx` | `POST /exams` no submit; `onCreated` → `refetch` na lista | `useCreateExam` + `invalidateQueries(examsQueryKey)` |
-| `components/edit-exam-dialog.tsx` | `GET`/`PATCH`/`DELETE` prova ao abrir dialog | `useExamDetail` + mutations |
-| `components/app-sidebar.tsx` | `GET` aplicadores + `PATCH` status no sheet | `useAplicadores(examId)` |
+| ~~`components/create-exam-dialog.tsx`~~ | — | **Feito** — `use-create-exam` + RHF |
+| ~~`components/edit-exam-dialog.tsx`~~ | — | **Feito** — `use-exam-detail` |
+| ~~`components/app-sidebar.tsx`~~ | — | **Feito** — `use-aplicadores` |
 | `app/aguardando/page.tsx` | Polling status (`setInterval` + `api`) | `useQuery` + `refetchInterval` |
 | `app/manage/aplicar/[examId]/page.tsx` | Presentes + contagem questões | `usePresentes`, reutilizar `getExamQuestions` |
 | `app/manage/aplicar/[examId]/[participantId]/page.tsx` | Questões, respostas, bulk answers | hooks aplicador + mutation bulk |
@@ -133,12 +136,12 @@ Detalhe passo a passo: `spec-frontend-migration-order.md`.
 | Questões ADM | Feito | Feito | `use-exam-questions` + RHF na página |
 | Detalhe aluno (sheet) | Feito | Feito | `use-student-detail` |
 | Ranking ADM + status prova | Feito | Feito | `use-admin-exam-results`, `use-update-exam-status` |
-| Create / edit / delete prova | Feito | **Pendente** | dialogs |
-| Sidebar aplicadores | Feito | **Pendente** | `app-sidebar.tsx` |
+| Create / edit / delete prova | Feito | Feito | `use-create-exam`, `use-exam-detail` + RHF |
+| Sidebar aplicadores | Feito | Feito | `use-aplicadores` |
 | Fluxo aplicador + aguardando | Feito | **Pendente** | `aplicar/*`, `aguardando` |
 | Login ADM / aplicador | Feito | Opcional | submit manual; lista provas aplicador sem Query |
 | Layouts título prova (RSC) | Feito | N/A | `publicAxiosRequest` no server |
-| Forms (RHF) | — | — | Parcial: participantes, questões; login/create/edit |
+| Forms (RHF) | — | — | Parcial: participantes, questões, create/edit prova; login pendente |
 | `DataTable` participantes | — | — | Pendente (`<table>` manual) |
 
 ## Referência — piloto resultados

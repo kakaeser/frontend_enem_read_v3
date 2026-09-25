@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { Pencil } from "lucide-react"
+import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,17 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { authAxiosRequest } from "@/lib/api"
-import { examSchema } from "@/lib/exam-schema"
-
-type ExamDetailResponse = {
-  nome?: string
-  notaSimbolica?: number
-  questions?: unknown[]
-  _count?: { questions?: number; participants?: number }
-}
+import {
+  examDetailCounts,
+  useDeleteExam,
+  useExamDetail,
+  useUpdateExam,
+} from "@/hooks/use-exam-detail"
+import { examSchema, type ExamPayload } from "@/lib/exam-schema"
 
 export function EditExamDialog({
   examId,
@@ -33,88 +33,70 @@ export function EditExamDialog({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [nome, setNome] = useState("")
-  const [nota, setNota] = useState(1000)
-  const [counts, setCounts] = useState<{
-    questions: number
-    participants: number
-  } | null>(null)
-  const [loadingData, setLoadingData] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+
+  const { data, isLoading: loadingData, isError: loadError } = useExamDetail(
+    examId,
+    open
+  )
+  const updateExam = useUpdateExam(examId)
+  const deleteExam = useDeleteExam(examId)
+
+  const form = useForm<ExamPayload>({
+    resolver: zodResolver(examSchema),
+    defaultValues: { nome: "", notaSimbolica: 1000 },
+  })
 
   useEffect(() => {
-    if (!open) return
-    const controller = new AbortController()
-    async function load() {
-      setLoadingData(true)
-      setError(null)
-      try {
-        const data = await authAxiosRequest<ExamDetailResponse>(
-          "GET",
-          `/exams/${examId}`,
-          { signal: controller.signal }
-        )
-        setNome(data.nome ?? "")
-        setNota(data.notaSimbolica ?? 1000)
-        setCounts({
-          questions: Array.isArray(data.questions)
-            ? data.questions.length
-            : (data._count?.questions ?? 0),
-          participants: data._count?.participants ?? 0,
-        })
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar os dados da prova.")
-      } finally {
-        setLoadingData(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [open, examId])
+    if (!data) return
+    form.reset({
+      nome: data.nome ?? "",
+      notaSimbolica: data.notaSimbolica ?? 1000,
+    })
+  }, [data, form])
+
+  const counts = examDetailCounts(data)
+  const nome = form.watch("nome")
 
   function openDialog() {
-    setError(null)
+    form.clearErrors()
     setConfirmDelete(false)
     setOpen(true)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    const parsed = examSchema.safeParse({ nome: nome.trim(), notaSimbolica: nota })
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Dados inválidos.")
-      return
-    }
-    setLoading(true)
-    try {
-      await authAxiosRequest("PATCH", `/exams/${examId}`, {
-        data: parsed.data,
-      })
-      setOpen(false)
-      onSaved?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro")
-    } finally {
-      setLoading(false)
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      setConfirmDelete(false)
+      updateExam.reset()
+      deleteExam.reset()
     }
   }
 
-  async function handleDelete() {
-    setDeleting(true)
-    setError(null)
-    try {
-      await authAxiosRequest("DELETE", `/exams/${examId}`)
-      router.push("/manage")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro")
-    } finally {
-      setDeleting(false)
-    }
+  function onSubmit(values: ExamPayload) {
+    updateExam.mutate(values, {
+      onSuccess: () => {
+        handleOpenChange(false)
+        onSaved?.()
+      },
+      onError: (err) => {
+        form.setError("root", {
+          message: err instanceof Error ? err.message : "Erro ao salvar.",
+        })
+      },
+    })
+  }
+
+  function handleDelete() {
+    deleteExam.mutate(undefined, {
+      onSuccess: () => router.push("/manage"),
+      onError: (err) => {
+        form.setError("root", {
+          message: err instanceof Error ? err.message : "Erro ao excluir.",
+        })
+        setConfirmDelete(false)
+      },
+    })
   }
 
   return (
@@ -129,7 +111,7 @@ export function EditExamDialog({
         Editar
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="bg-read-darkest border-read-ink">
           <DialogHeader>
             <DialogTitle className="text-read-white">Editar prova</DialogTitle>
@@ -139,67 +121,70 @@ export function EditExamDialog({
           </DialogHeader>
           {loadingData ? (
             <p className="text-sm text-read-gray">Carregando dados…</p>
+          ) : loadError ? (
+            <p className="text-sm text-red-400">
+              Não foi possível carregar os dados da prova.
+            </p>
           ) : (
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="exam-nome" className="text-read-white">
-                  Nome
-                </FieldLabel>
-                <Input
-                  id="exam-nome"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  required
-                  className="border-read-ink bg-read-ink-dark text-read-white placeholder:text-read-gray/40 focus-visible:ring-read-green"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="exam-nota" className="text-read-white">
-                  Nota simbólica
-                </FieldLabel>
-                <Input
-                  id="exam-nota"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={nota}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10)
-                    setNota(Number.isNaN(v) ? 1 : Math.max(1, v))
-                  }}
-                  required
-                  className="border-read-ink bg-read-ink-dark text-read-white focus-visible:ring-read-green"
-                />
-              </Field>
-              {error && <p className="text-sm text-red-400">{error}</p>}
-            </FieldGroup>
-            <DialogFooter className="mt-6 gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setConfirmDelete(true)}
-                className="mr-auto text-red-400 hover:bg-read-ink hover:text-red-500"
-              >
-                Excluir prova
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                className="border-read-ink bg-transparent text-read-white hover:bg-read-ink"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white"
-              >
-                {loading ? "Salvando..." : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </form>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <FieldGroup>
+                <Field data-invalid={!!form.formState.errors.nome}>
+                  <FieldLabel htmlFor="exam-nome" className="text-read-white">
+                    Nome
+                  </FieldLabel>
+                  <Input
+                    id="exam-nome"
+                    className="border-read-ink bg-read-ink-dark text-read-white placeholder:text-read-gray/40 focus-visible:ring-read-green"
+                    {...form.register("nome")}
+                  />
+                  <FieldError errors={[form.formState.errors.nome]} />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.notaSimbolica}>
+                  <FieldLabel htmlFor="exam-nota" className="text-read-white">
+                    Nota simbólica
+                  </FieldLabel>
+                  <Input
+                    id="exam-nota"
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="border-read-ink bg-read-ink-dark text-read-white focus-visible:ring-read-green"
+                    {...form.register("notaSimbolica", { valueAsNumber: true })}
+                  />
+                  <FieldError errors={[form.formState.errors.notaSimbolica]} />
+                </Field>
+                {form.formState.errors.root && (
+                  <p className="text-sm text-red-400">
+                    {form.formState.errors.root.message}
+                  </p>
+                )}
+              </FieldGroup>
+              <DialogFooter className="mt-6 gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setConfirmDelete(true)}
+                  className="mr-auto text-red-400 hover:bg-read-ink hover:text-red-500"
+                >
+                  Excluir prova
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  className="border-read-ink bg-transparent text-read-white hover:bg-read-ink"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateExam.isPending}
+                  className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white"
+                >
+                  {updateExam.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </DialogFooter>
+            </form>
           )}
         </DialogContent>
       </Dialog>
@@ -222,17 +207,17 @@ export function EditExamDialog({
             <Button
               variant="ghost"
               onClick={() => setConfirmDelete(false)}
-              disabled={deleting}
+              disabled={deleteExam.isPending}
               className="text-read-gray hover:bg-read-ink hover:text-read-white"
             >
               Cancelar
             </Button>
             <Button
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleteExam.isPending}
               className="bg-red-500 text-white hover:bg-red-700"
             >
-              {deleting ? "Excluindo…" : "Excluir tudo"}
+              {deleteExam.isPending ? "Excluindo…" : "Excluir tudo"}
             </Button>
           </DialogFooter>
         </DialogContent>
