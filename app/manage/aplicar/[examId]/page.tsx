@@ -1,56 +1,30 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ChevronRight, Search } from "lucide-react"
 import { AplicarTabs } from "@/components/aplicar-tabs"
 import { Badge } from "@/components/ui/badge"
-import { authAxiosRequest } from "@/lib/api"
+import { useExamPresentes } from "@/hooks/use-presentes"
+import { useExamQuestions } from "@/hooks/use-exam-questions"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
-
-type Presente = {
-  id: number
-  nome: string
-  _count: { answers: number }
-}
 
 export default function AplicarListPage() {
   const { examId } = useParams<{ examId: string }>()
   const ready = useAplicarAuth(examId)
-  const [presentes, setPresentes] = useState<Presente[]>([])
-  const [totalQuestoes, setTotalQuestoes] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
 
-  useEffect(() => {
-    if (!ready) return
-    const controller = new AbortController()
-    async function load() {
-      try {
-        const [dataP, dataQ] = await Promise.all([
-          authAxiosRequest<Presente[]>(
-            "GET",
-            `/exams/${examId}/participants/presentes`,
-            { signal: controller.signal }
-          ),
-          authAxiosRequest<unknown[]>("GET", `/exams/${examId}/questions`, {
-            signal: controller.signal,
-          }),
-        ])
-        setPresentes(Array.isArray(dataP) ? dataP : [])
-        setTotalQuestoes(Array.isArray(dataQ) ? dataQ.length : 0)
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar os presentes.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [ready, examId])
+  const {
+    data: presentes = [],
+    isLoading: loadingPresentes,
+    isError: errorPresentes,
+  } = useExamPresentes(examId, ready)
+  const { data: questions = [], isLoading: loadingQuestions } =
+    useExamQuestions(examId, ready)
+
+  const loading = !ready || loadingPresentes || loadingQuestions
+  const totalQuestoes = questions.length
 
   if (!ready) return null
 
@@ -86,21 +60,23 @@ export default function AplicarListPage() {
         <p className="text-sm text-read-gray">Carregando presentes…</p>
       )}
 
-      {!loading && error && <p className="text-sm text-red-400">{error}</p>}
+      {!loading && errorPresentes && (
+        <p className="text-sm text-red-400">Não foi possível carregar os presentes.</p>
+      )}
 
-      {!loading && !error && presentes.length === 0 && (
+      {!loading && !errorPresentes && presentes.length === 0 && (
         <p className="text-sm text-read-gray">
           Nenhum aluno presente. Marque a presença na página de participantes.
         </p>
       )}
 
-      {!loading && !error && presentes.length > 0 && visible.length === 0 && (
+      {!loading && !errorPresentes && presentes.length > 0 && visible.length === 0 && (
         <p className="text-sm text-read-gray">
           Nenhum aluno encontrado para “{search.trim()}”.
         </p>
       )}
 
-      {!loading && !error && visible.length > 0 && (
+      {!loading && !errorPresentes && visible.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-read-ink bg-read-ink-dark">
           <ul className="divide-y divide-read-ink">
             {visible.map((p) => (
@@ -115,12 +91,12 @@ export default function AplicarListPage() {
                   <Badge
                     className={`tabular-nums ${
                       totalQuestoes > 0 &&
-                      p._count.answers === totalQuestoes
+                      (p._count?.answers ?? 0) === totalQuestoes
                         ? "bg-read-green text-read-logo-dark"
                         : "bg-read-ink text-read-gray"
                     }`}
                   >
-                    {p._count.answers}/{totalQuestoes}
+                    {p._count?.answers ?? 0}/{totalQuestoes}
                   </Badge>
                   <ChevronRight className="h-4 w-4 shrink-0 text-read-gray" />
                 </Link>

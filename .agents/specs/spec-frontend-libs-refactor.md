@@ -75,8 +75,12 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 | `hooks/use-create-exam.ts` | `components/create-exam-dialog.tsx` |
 | `hooks/use-exam-detail.ts` | `components/edit-exam-dialog.tsx` |
 | `hooks/use-aplicadores.ts` | `components/app-sidebar.tsx` |
+| `hooks/use-aplicador-me.ts` | `app/aguardando/page.tsx` |
+| `hooks/use-presentes.ts` | `app/manage/aplicar/*` (lista + redação) |
+| `hooks/use-participant-answers.ts` | `app/manage/aplicar/.../[participantId]/page.tsx` |
+| `hooks/use-bulk-answers.ts` | corretor (envio bulk) |
 
-**Total:** 11 hooks de domínio com TSQ.
+**Total:** 15 hooks de domínio com TSQ.
 
 ### Sem TSQ (API via `lib/api` + estado manual ou RSC)
 
@@ -86,10 +90,10 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 | ~~`components/create-exam-dialog.tsx`~~ | — | **Feito** — `use-create-exam` + RHF |
 | ~~`components/edit-exam-dialog.tsx`~~ | — | **Feito** — `use-exam-detail` |
 | ~~`components/app-sidebar.tsx`~~ | — | **Feito** — `use-aplicadores` |
-| `app/aguardando/page.tsx` | Polling status (`setInterval` + `api`) | `useQuery` + `refetchInterval` |
-| `app/manage/aplicar/[examId]/page.tsx` | Presentes + contagem questões | `usePresentes`, reutilizar `getExamQuestions` |
-| `app/manage/aplicar/[examId]/[participantId]/page.tsx` | Questões, respostas, bulk answers | hooks aplicador + mutation bulk |
-| `app/manage/aplicar/[examId]/redacao/page.tsx` | Presentes + `PATCH` redação por linha | query presentes + mutation redação |
+| ~~`app/aguardando/page.tsx`~~ | — | **Feito** — `use-aplicador-me` |
+| ~~`app/manage/aplicar/[examId]/page.tsx`~~ | — | **Feito** — `use-presentes` + `use-exam-questions` |
+| ~~`app/manage/aplicar/.../[participantId]/page.tsx`~~ | — | **Feito** — answers + `use-bulk-answers` |
+| ~~`app/manage/aplicar/.../redacao/page.tsx`~~ | — | **Feito** — `usePatchPresenteRedacao` |
 | `components/aplicador-login-form.tsx` | `GET /exams?status=in_progress` + login POST | `useInProgressExams` (+ mutation login opcional) |
 | `components/login-form.tsx` | `POST /auth/login` no submit | TSQ opcional (`useMutation`); `useEffect` só redirect se token válido |
 | `app/manage/[examId]/layout.tsx` | `GET /exams/:id` no **Server Component** | Manter RSC ou client + `useExamDetail` (decisão no Passo 7) |
@@ -138,7 +142,7 @@ Detalhe passo a passo: `spec-frontend-migration-order.md`.
 | Ranking ADM + status prova | Feito | Feito | `use-admin-exam-results`, `use-update-exam-status` |
 | Create / edit / delete prova | Feito | Feito | `use-create-exam`, `use-exam-detail` + RHF |
 | Sidebar aplicadores | Feito | Feito | `use-aplicadores` |
-| Fluxo aplicador + aguardando | Feito | **Pendente** | `aplicar/*`, `aguardando` |
+| Fluxo aplicador + aguardando | Feito | Feito | hooks Passo 5 |
 | Login ADM / aplicador | Feito | Opcional | submit manual; lista provas aplicador sem Query |
 | Layouts título prova (RSC) | Feito | N/A | `publicAxiosRequest` no server |
 | Forms (RHF) | — | — | Parcial: participantes, questões, create/edit prova; login pendente |

@@ -45,11 +45,11 @@ export async function deleteExamQuestion(
   await authAxiosRequest("DELETE", `/exams/${examId}/questions/${questionId}`)
 }
 
-export function useExamQuestions(examId: string) {
+export function useExamQuestions(examId: string, enabled = true) {
   return useQuery<ExamQuestion[], Error>({
     queryKey: examQuestionsQueryKey(examId),
     queryFn: ({ signal }) => getExamQuestions(examId, signal),
-    enabled: Boolean(examId),
+    enabled: Boolean(examId) && enabled,
   })
 }
 

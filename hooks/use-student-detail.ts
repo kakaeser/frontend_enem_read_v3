@@ -54,7 +54,7 @@ export function useStudentDetail(
   })
 }
 
-async function patchParticipantRedacao(
+export async function patchParticipantRedacao(
   examId: string,
   participantId: number,
   redacaoNota: number | null

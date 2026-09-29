@@ -5,8 +5,8 @@
 ## 1. Infra & Prisma [X] parcial
 
 - [X] `prisma/schema.prisma` com 6 models + enums (Exam, Adm sem role, Aplicador PENDENTE|APROVADO|REJEITADO, Participant com aplicadorId, Question com Json, Answer sem examId redundante)
-- [X] `prisma.config.ts` minimal + `.env.example` com DATABASE_URL/DIRECT_URL Supabase + JWT_SECRET
-- [X] `npx prisma validate/migrate dev --name init/generate` verde em `aws-0-sa-east-1.pooler.supabase.com`
+- [X] `prisma.config.ts` minimal + `.env.example` com DATABASE_URL/DIRECT_URL Neon + JWT_SECRET/JWT_REFRESH_SECRET
+- [X] `npx prisma validate/migrate dev --name init/generate` verde em Neon (`*.neon.tech`)
 - [X] `src/prisma/prisma.service.ts` estende PrismaClient + `src/prisma/prisma.module.ts` @Global
 - [X] `src/app.module.ts` importa PrismaModule + fix build (generator default @prisma/client, remove src/generated)
 - [X] `npm run lint/build/test` verde (14 specs)
@@ -83,7 +83,7 @@
 - [ ] Fluxo completo e2e: `POST /auth/login` → `POST /exams` (qtd 70) → `PUT bulk questions` → `POST participants import` → `POST answers bulk` → `PATCH redacaoNota` → `GET /exams/:id/results` → `GET /resultados` (espera 403 antes, 200 após mock de data)
 - [ ] Unit só para `ResultsService.calcNota` (lógica ponderada isolada, sem DB)
 - [ ] `npm run lint && npm run build && npm run test && npm run test:e2e && npx prisma validate` verde no CI
-- [ ] `Dockerfile` + `gcloud run deploy` com `DATABASE_URL,DIRECT_URL,JWT_SECRET` (não usar `nest deploy`)
+- [X] `Dockerfile` + deploy **Render** com `DATABASE_URL,DIRECT_URL,JWT_SECRET,JWT_REFRESH_SECRET,FRONTEND_URL` (não usar `nest deploy` / Cloud Run)
 
 ## 9. Docs & Housekeeping [ ]
 

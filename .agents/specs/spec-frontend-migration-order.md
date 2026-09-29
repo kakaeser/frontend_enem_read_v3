@@ -25,8 +25,8 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 | Feito | Detalhe aluno (sheet) | `hooks/use-student-detail.ts`, `components/rank-student-sheet.tsx` |
 | Feito | Lista de provas ADM | `hooks/use-exams.ts`, `app/manage/page.tsx` |
 | Feito | HTTP (`lib/api.ts`) | `tryRefresh`, `authAxiosRequest`, `publicAxiosRequest`; `@/lib/auth-axios` reexport deprecated |
-| Parcial | TanStack Query | 11 hooks; Passos 3–4 feitos; fluxo aplicador (Passo 5) pendente |
-| Pendente | RHF logins, TSQ aplicar/aguardando, polish | ver passos abaixo |
+| Parcial | TanStack Query | 15 hooks; Passos 3–5 feitos; logins (Passo 6) pendente |
+| Pendente | RHF logins, layouts RSC polish (Passo 7) | ver passos abaixo |
 
 ---
 
@@ -117,6 +117,8 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ## Passo 5 — Fluxo aplicador (`aguardando` + `aplicar/*`)
 
+**Status: feito** (`use-aplicador-me`, `use-presentes`, `use-participant-answers`, `use-bulk-answers` + páginas aplicador).
+
 **Objetivo:** mesma stack; rotas autenticadas com Bearer (aplicador pode não ter `refresh_token` — tratar 401 com redirect login).
 
 ### Hooks sugeridos (agrupar por domínio)
@@ -129,11 +131,11 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ### Arquivos
 
-- [ ] `app/aguardando/page.tsx`
-- [ ] `app/manage/aplicar/[examId]/page.tsx`
-- [ ] `app/manage/aplicar/[examId]/[participantId]/page.tsx`
-- [ ] `app/manage/aplicar/[examId]/redacao/page.tsx`
-- [ ] `components/aplicar-logout-button.tsx` — centralizar logout (opcional)
+- [x] `app/aguardando/page.tsx`
+- [x] `app/manage/aplicar/[examId]/page.tsx`
+- [x] `app/manage/aplicar/[examId]/[participantId]/page.tsx`
+- [x] `app/manage/aplicar/[examId]/redacao/page.tsx`
+- [x] `components/aplicar-logout-button.tsx` — já usa `logoutSession` (sem mudança)
 
 ### Critério de pronto
 

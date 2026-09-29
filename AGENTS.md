@@ -17,7 +17,7 @@ Refatoração do `enem_read` (FastAPI + SQLAlchemy) para **NestJS + Prisma** (ba
 ```
 enem_read_v3/
   frontend_enem_read_v3/  # este repo — Next.js App Router
-  backend_enem_read_v3/   # NestJS 12 + Prisma 6 + Postgres (Supabase) — irmão, não monorepo workspaces
+  backend_enem_read_v3/   # NestJS 12 + Prisma 6 + Postgres (Neon) + API no Render — irmão, não monorepo workspaces
 ```
 
 Sem workspaces — cada projeto tem seu `package.json`/`node_modules`. Backend path: `../backend_enem_read_v3`.
@@ -86,9 +86,9 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 
 ## Infra / Deploy
 
-- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com o backend via HTTPS (`NEXT_PUBLIC_API_URL`).
-- Backend → **Google Cloud Run** (`PORT` injetado, `Dockerfile` + `gcloud run deploy`; não usar `nest deploy`/`mau`).
-- DB → **Supabase Postgres** — requer `DATABASE_URL` (pooler `:6543?pgbouncer=true`) + `DIRECT_URL` (`:5432`) no `.env` (gitignored). Ver `prisma.config.ts:1` e `.env.example` no backend.
+- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com a API via HTTPS (`NEXT_PUBLIC_API_URL` → URL do Render).
+- Backend → **Render** — NestJS com `PORT` injetado (`process.env.PORT ?? 3030`); deploy via `Dockerfile` (multi-stage) ou build nativo no Render. Env: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`. Detalhes em `../backend_enem_read_v3/AGENTS.md` e `../backend_enem_read_v3/docs/render-keep-alive.md`.
+- DB → **Neon Postgres** (só no backend) — `DATABASE_URL` (pooler) + `DIRECT_URL` (conexão direta / `DATABASE_URL_UNPOOLED`) no `.env` do backend (gitignored). Prisma: `directUrl = env("DIRECT_URL")` em `prisma/schema.prisma`.
 
 ## Gotchas
 
