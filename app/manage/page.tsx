@@ -20,7 +20,11 @@ export default function ManagePage() {
         ) : isError ? (
           <p className="text-sm text-red-400">Não foi possível carregar as provas.</p>
         ) : (
-          <DataTable columns={columns} data={data ?? []} />
+          <DataTable
+            columns={columns}
+            data={data ?? []}
+            rowHref={(row) => `/manage/${row.id}`}
+          />
         )}
       </main>
     </div>

@@ -1,16 +1,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-
-function decodePayload(token: string): {
-  type?: string
-  provaId?: number
-} | null {
-  try {
-    return JSON.parse(atob(token.split(".")[1]))
-  } catch {
-    return null
-  }
-}
+import { decodeJwtPayload } from "@/lib/auth-token"
 
 // ADM entra em qualquer prova; aplicador só na própria provaId.
 export function useAplicarAuth(examId: string): boolean {
@@ -19,7 +9,7 @@ export function useAplicarAuth(examId: string): boolean {
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
-    const payload = token ? decodePayload(token) : null
+    const payload = token ? decodeJwtPayload(token) : null
     if (!token || !payload) {
       router.replace("/login")
       return

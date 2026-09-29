@@ -13,9 +13,21 @@ interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
   rowHref?: (row: TData) => string
+  toolbarEnd?: React.ReactNode
+  searchPlaceholder?: string
+  filterColumnId?: string
+  emptyMessage?: string
 }
 
-export function DataTable<TData extends RowData>({ columns, data, rowHref }: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({
+  columns,
+  data,
+  rowHref,
+  toolbarEnd,
+  searchPlaceholder = "Buscar prova...",
+  filterColumnId = "nome",
+  emptyMessage = "Nenhuma prova encontrada.",
+}: DataTableProps<TData>) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -29,19 +41,21 @@ export function DataTable<TData extends RowData>({ columns, data, rowHref }: Dat
     state: { sorting, columnFilters },
   })
 
+  const filterColumn = table.getColumn(filterColumnId)
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
           <input
-            placeholder="Buscar prova..."
-            value={(table.getColumn("nome")?.getFilterValue() as string) ?? ""}
-            onChange={(e) => table.getColumn("nome")?.setFilterValue(e.target.value)}
+            placeholder={searchPlaceholder}
+            value={(filterColumn?.getFilterValue() as string) ?? ""}
+            onChange={(e) => filterColumn?.setFilterValue(e.target.value)}
             className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
           />
         </div>
-        <CreateExamDialog />
+        {toolbarEnd ?? <CreateExamDialog />}
       </div>
       <div className="overflow-hidden rounded-lg border border-read-green">
         <Table>
@@ -58,26 +72,32 @@ export function DataTable<TData extends RowData>({ columns, data, rowHref }: Dat
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  onClick={() => {
-                    const exam = row.original as { id: number }
-                    router.push(rowHref ? rowHref(row.original) : `/manage/${exam.id}`)
-                  }}
-                  className="cursor-pointer hover:bg-read-ink border-read-ink/50"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      <table.FlexRender cell={cell} />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const href = rowHref?.(row.original)
+                return (
+                  <TableRow
+                    key={row.id}
+                    onClick={() => {
+                      if (href) router.push(href)
+                    }}
+                    className={
+                      href
+                        ? "cursor-pointer hover:bg-read-ink border-read-ink/50"
+                        : "border-read-ink/50"
+                    }
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        <table.FlexRender cell={cell} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-read-gray">
-                  Nenhuma prova encontrada.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}

@@ -25,8 +25,8 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 | Feito | Detalhe aluno (sheet) | `hooks/use-student-detail.ts`, `components/rank-student-sheet.tsx` |
 | Feito | Lista de provas ADM | `hooks/use-exams.ts`, `app/manage/page.tsx` |
 | Feito | HTTP (`lib/api.ts`) | `tryRefresh`, `authAxiosRequest`, `publicAxiosRequest`; `@/lib/auth-axios` reexport deprecated |
-| Parcial | TanStack Query | 15 hooks; Passos 3–5 feitos; logins (Passo 6) pendente |
-| Pendente | RHF logins, layouts RSC polish (Passo 7) | ver passos abaixo |
+| Parcial | TanStack Query | 18 hooks; Passos 3–6 feitos |
+| Pendente | layouts RSC polish (Passo 7) | ver passos abaixo |
 
 ---
 
@@ -36,7 +36,7 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ### Tarefas restantes (opcional)
 
-- [ ] Criar `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid` (skew ~30s), reutilizar nos logins
+- [x] Criar `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid` (skew ~30s), reutilizar nos logins
 - [ ] Evoluir para `axios.create` + interceptors se quiser alinhar 100% à spec “empresa”
 
 ### Critério de pronto (atingido)
@@ -144,16 +144,19 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ---
 
-## Passo 6 — Formulários de login (RHF + Zod)
+## Passo 6 — Formulários de login (RHF + Zod) + participantes (DataTable)
+
+**Status: feito** (logins RHF + `participantes/columns.tsx` + `DataTable` generalizado).
 
 **Objetivo:** alinhar aos dialogs já migrados (`add-participants-dialog`, questões).
 
 ### Arquivos
 
-- [ ] `components/login-form.tsx` — `useForm` + `zodResolver`; `POST /auth/login` via Axios (`api` público)
-- [ ] `components/aplicador-login-form.tsx` — RHF; `GET /exams?status=in_progress` via Query (`enabled` no mount); login mutation
-- [ ] Extrair schemas para `lib/login-schema.ts` / reutilizar `lib/exam-schema.ts` onde couber
-- [ ] Remover duplicação de `decodePayload` / `isTokenValid` (usar `lib/auth-token.ts` do Passo 1)
+- [x] `components/login-form.tsx` — `useForm` + `zodResolver`; `use-adm-login`
+- [x] `components/aplicador-login-form.tsx` — RHF; `use-in-progress-exams`; `use-aplicador-login`
+- [x] `lib/login-schema.ts`
+- [x] `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid`
+- [x] `app/manage/[examId]/participantes/` — `columns.tsx` + `DataTable` (filtro client-side)
 
 ### Critério de pronto
 
@@ -178,7 +181,7 @@ Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só entã
 
 ### Extras (spec original)
 
-- [ ] Participantes: opcional migrar `<table>` manual para `DataTable` + colunas (filtro client-side)
+- [x] Participantes: `DataTable` + colunas (feito no Passo 6)
 - [ ] `lib/query-keys.ts` — centralizar factories (`examsQueryKey`, etc.) quando a maioria dos hooks existir
 - [ ] Atualizar tabela “Progresso” em `spec-frontend-libs-refactor.md`
 

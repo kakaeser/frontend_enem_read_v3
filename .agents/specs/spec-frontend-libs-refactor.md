@@ -79,8 +79,11 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 | `hooks/use-presentes.ts` | `app/manage/aplicar/*` (lista + redação) |
 | `hooks/use-participant-answers.ts` | `app/manage/aplicar/.../[participantId]/page.tsx` |
 | `hooks/use-bulk-answers.ts` | corretor (envio bulk) |
+| `hooks/use-adm-login.ts` | `components/login-form.tsx` |
+| `hooks/use-aplicador-login.ts` | `components/aplicador-login-form.tsx` |
+| `hooks/use-in-progress-exams.ts` | `components/aplicador-login-form.tsx` |
 
-**Total:** 15 hooks de domínio com TSQ.
+**Total:** 18 hooks de domínio com TSQ.
 
 ### Sem TSQ (API via `lib/api` + estado manual ou RSC)
 
@@ -94,8 +97,8 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 | ~~`app/manage/aplicar/[examId]/page.tsx`~~ | — | **Feito** — `use-presentes` + `use-exam-questions` |
 | ~~`app/manage/aplicar/.../[participantId]/page.tsx`~~ | — | **Feito** — answers + `use-bulk-answers` |
 | ~~`app/manage/aplicar/.../redacao/page.tsx`~~ | — | **Feito** — `usePatchPresenteRedacao` |
-| `components/aplicador-login-form.tsx` | `GET /exams?status=in_progress` + login POST | `useInProgressExams` (+ mutation login opcional) |
-| `components/login-form.tsx` | `POST /auth/login` no submit | TSQ opcional (`useMutation`); `useEffect` só redirect se token válido |
+| ~~`components/aplicador-login-form.tsx`~~ | — | **Feito** — `use-in-progress-exams`, `use-aplicador-login` + RHF |
+| ~~`components/login-form.tsx`~~ | — | **Feito** — `use-adm-login` + RHF; redirect no mount |
 | `app/manage/[examId]/layout.tsx` | `GET /exams/:id` no **Server Component** | Manter RSC ou client + `useExamDetail` (decisão no Passo 7) |
 | `app/manage/aplicar/[examId]/layout.tsx` | Idem título da prova (RSC) | Idem |
 
@@ -143,10 +146,10 @@ Detalhe passo a passo: `spec-frontend-migration-order.md`.
 | Create / edit / delete prova | Feito | Feito | `use-create-exam`, `use-exam-detail` + RHF |
 | Sidebar aplicadores | Feito | Feito | `use-aplicadores` |
 | Fluxo aplicador + aguardando | Feito | Feito | hooks Passo 5 |
-| Login ADM / aplicador | Feito | Opcional | submit manual; lista provas aplicador sem Query |
+| Login ADM / aplicador | Feito | Feito | `use-adm-login`, `use-aplicador-login`, `use-in-progress-exams` + RHF |
 | Layouts título prova (RSC) | Feito | N/A | `publicAxiosRequest` no server |
-| Forms (RHF) | — | — | Parcial: participantes, questões, create/edit prova; login pendente |
-| `DataTable` participantes | — | — | Pendente (`<table>` manual) |
+| Forms (RHF) | — | — | Feito: logins, participantes, questões, create/edit prova |
+| `DataTable` participantes | — | — | Feito — `participantes/columns.tsx` + `DataTable` |
 
 ## Referência — piloto resultados
 

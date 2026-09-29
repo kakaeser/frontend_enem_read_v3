@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { Search, Trash2 } from "lucide-react"
 import { AddParticipantsDialog } from "@/components/add-participants-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,12 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { DataTable } from "@/app/manage/data-table"
 import {
   useDeleteParticipant,
   useExamParticipants,
   useUpdateParticipantPresenca,
   type ExamParticipant,
 } from "@/hooks/use-exam-participants"
+import { createParticipantColumns } from "./columns"
 
 export default function ParticipantesPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -29,28 +30,30 @@ export default function ParticipantesPage() {
 
   const [actionError, setActionError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ExamParticipant | null>(null)
-  const [search, setSearch] = useState("")
 
   const presentes = participants.filter((p) => p.presenca).length
-  const visible = participants.filter((p) =>
-    p.nome.toLowerCase().includes(search.trim().toLowerCase())
-  )
 
-  function togglePresenca(p: ExamParticipant) {
-    setActionError(null)
-    presencaMutation.mutate(
-      { id: p.id, presenca: !p.presenca },
-      {
-        onError: (e) => {
-          setActionError(
-            e instanceof Error
-              ? `Erro ao atualizar ${p.nome}: ${e.message}`
-              : `Erro ao atualizar ${p.nome}.`
-          )
-        },
-      }
-    )
-  }
+  const togglingId =
+    presencaMutation.isPending ? presencaMutation.variables?.id : undefined
+
+  const togglePresenca = useCallback(
+    (p: ExamParticipant) => {
+      setActionError(null)
+      presencaMutation.mutate(
+        { id: p.id, presenca: !p.presenca },
+        {
+          onError: (e) => {
+            setActionError(
+              e instanceof Error
+                ? `Erro ao atualizar ${p.nome}: ${e.message}`
+                : `Erro ao atualizar ${p.nome}.`
+            )
+          },
+        }
+      )
+    },
+    [presencaMutation]
+  )
 
   function confirmDelete() {
     const target = deleteTarget
@@ -69,8 +72,15 @@ export default function ParticipantesPage() {
     })
   }
 
-  const togglingId =
-    presencaMutation.isPending ? presencaMutation.variables?.id : undefined
+  const columns = useMemo(
+    () =>
+      createParticipantColumns({
+        togglingId,
+        onTogglePresenca: togglePresenca,
+        onDelete: setDeleteTarget,
+      }),
+    [togglingId, togglePresenca]
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -88,18 +98,6 @@ export default function ParticipantesPage() {
           </>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar aluno…"
-            className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
-          />
-        </div>
-        <AddParticipantsDialog examId={examId} />
-      </div>
 
       {actionError && <p className="text-sm text-red-400">{actionError}</p>}
 
@@ -114,54 +112,22 @@ export default function ParticipantesPage() {
       )}
 
       {!isLoading && !isError && participants.length === 0 && (
-        <p className="text-sm text-read-gray">
-          Nenhum participante cadastrado. Clique em Adicionar para começar.
-        </p>
-      )}
-
-      {!isLoading && !isError && participants.length > 0 && visible.length === 0 && (
-        <p className="text-sm text-read-gray">
-          Nenhum participante encontrado para “{search.trim()}”.
-        </p>
-      )}
-
-      {!isLoading && !isError && visible.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-read-ink bg-read-ink-dark">
-          <ul className="divide-y divide-read-ink">
-            {visible.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-read-white">
-                  {p.nome}
-                </span>
-                {p.presenca ? (
-                  <Badge className="bg-read-green text-read-logo-dark">
-                    presente
-                  </Badge>
-                ) : (
-                  <Badge className="bg-read-ink text-read-gray">ausente</Badge>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => togglePresenca(p)}
-                  disabled={togglingId === p.id}
-                  className="border-read-ink bg-transparent text-xs text-read-gray hover:border-read-green hover:text-read-green disabled:opacity-50"
-                >
-                  {p.presenca ? "Marcar ausente" : "Marcar presente"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteTarget(p)}
-                  className="h-8 w-8 shrink-0 text-red-400 hover:bg-read-ink hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Remover {p.nome}</span>
-                </Button>
-              </li>
-            ))}
-          </ul>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-read-gray">
+            Nenhum participante cadastrado. Clique em Adicionar para começar.
+          </p>
+          <AddParticipantsDialog examId={examId} />
         </div>
+      )}
+
+      {!isLoading && !isError && participants.length > 0 && (
+        <DataTable
+          columns={columns}
+          data={participants}
+          toolbarEnd={<AddParticipantsDialog examId={examId} />}
+          searchPlaceholder="Buscar aluno…"
+          emptyMessage="Nenhum participante encontrado."
+        />
       )}
 
       <Dialog

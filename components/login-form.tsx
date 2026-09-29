@@ -1,96 +1,75 @@
 'use client'
 import { cn } from "@/lib/utils"
 
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import z from "zod"
-import { publicAxiosRequest } from "@/lib/api"
-
-function decodePayload(token: string): { exp?: number; type?: string } | null {
-  try {
-    return JSON.parse(atob(token.split(".")[1]))
-  } catch {
-    return null
-  }
-}
-function isTokenValid(token: string): boolean {
-  const p = decodePayload(token)
-  if (!p?.exp) return !!p
-  return p.exp * 1000 > Date.now()
-}
+import { decodeJwtPayload, isAccessTokenValid } from "@/lib/auth-token"
+import { admLoginSchema, type AdmLoginFormValues } from "@/lib/login-schema"
+import { useAdmLogin } from "@/hooks/use-adm-login"
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
-  const loginSchema = z.object({
-    email: z.string().email({ message: "Email inválido" }),
-    senha: z.string().min(6, { message: "Senha deve ter no mínimo 6 caracteres" }),
-  })
-  const [email, setEmail] = useState<string>("")
-  const [senha, setSenha] = useState<string>("")
-  const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null)
-  const [loading, setLoading] = useState<boolean>(false)
-
-
   const router = useRouter()
+  const loginMutation = useAdmLogin()
+
+  const form = useForm<AdmLoginFormValues>({
+    resolver: zodResolver(admLoginSchema),
+    defaultValues: { email: "", senha: "" },
+  })
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
-    if (!token || !isTokenValid(token)) return
-    const payload = decodePayload(token)
+    if (!token || !isAccessTokenValid(token)) return
+    const payload = decodeJwtPayload(token)
     if (payload?.type === "aplicador") router.replace("/aguardando")
     else router.replace("/manage")
   }, [router])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setMsg(null)
-    const result = loginSchema.safeParse({ email, senha })
-    if (!result.success) {
-      setMsg({ type: "error", text: result.error.message })
-      return
-    }
-    setLoading(true)
-    try {
-      const { access_token, refresh_token } = await publicAxiosRequest<{
-        access_token: string
-        refresh_token?: string
-      }>("POST", "/auth/login", {
-        data: { email, senha },
-      })
-      localStorage.setItem("access_token", access_token)
-      if (refresh_token) localStorage.setItem("refresh_token", refresh_token)
-      setMsg({ type: "success", text: "Logado!" })
-      router.replace("/manage")
-    } catch (err) {
-      setMsg({ type: "error", text: err instanceof Error ? err.message : "Erro" })
-    } finally{
-      setLoading(false)
-    }
-
+  function onSubmit(values: AdmLoginFormValues) {
+    form.clearErrors("root")
+    loginMutation.mutate(values, {
+      onSuccess: () => {
+        router.replace("/manage")
+      },
+      onError: (err) => {
+        form.setError("root", {
+          message: err instanceof Error ? err.message : "Erro",
+        })
+      },
+    })
   }
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 border-read-dark bg-read-dark/40 backdrop-blur">
         <CardContent className="grid p-0 md:grid-cols-2">
-          <form className="p-6 md:p-8 bg-read-logo-dark" onSubmit={handleSubmit}>
+          <form className="p-6 md:p-8 bg-read-logo-dark" onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold text-read-white">ENEM da READ</h1>
                 <p className="text-balance text-sm text-read-gray">Entre com seu email e senha de ADM</p>
                 <p className="text-balance text-sm text-read-blue">* Login é apenas para os organizadores do evento!</p>
               </div>
-              <Field>
+              <Field data-invalid={!!form.formState.errors.email}>
                 <FieldLabel htmlFor="email" className="text-read-white">
                   Email
                 </FieldLabel>
-                <Input id="email" type="email" placeholder="example@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@email.com"
+                  className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green"
+                  {...form.register("email")}
+                />
+                <FieldError errors={[form.formState.errors.email]} />
               </Field>
-              <Field>
+              <Field data-invalid={!!form.formState.errors.senha}>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password" className="text-read-white">
                     Senha
@@ -99,12 +78,25 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                     Esqueceu a senha?
                   </a>
                 </div>
-                <Input id="password" type="password" placeholder="example" value={senha} onChange={(e) => setSenha(e.target.value)} required className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="example"
+                  className="border-read-ink bg-read-ink text-read-white placeholder:text-read-gray focus-visible:ring-read-green"
+                  {...form.register("senha")}
+                />
+                <FieldError errors={[form.formState.errors.senha]} />
               </Field>
-              {msg && <p className={`text-sm ${msg.type === "error" ? "text-red-400" : "text-read-green"}`}>{msg.text}</p>}
+              {form.formState.errors.root && (
+                <p className="text-sm text-red-400">{form.formState.errors.root.message}</p>
+              )}
               <Field>
-                <Button type="submit" disabled={loading} className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white">
-                  {loading ? "Enviando..." : "Entrar"}
+                <Button
+                  type="submit"
+                  disabled={loginMutation.isPending}
+                  className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white"
+                >
+                  {loginMutation.isPending ? "Enviando..." : "Entrar"}
                 </Button>
               </Field>
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-read-logo-dark text-read-gray">ou continue com</FieldSeparator>
