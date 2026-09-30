@@ -1,226 +1,101 @@
 # Ordem de migração — TanStack Query + Axios + Zod + RHF
 
-Passo a passo para concluir a refatoração descrita em `spec-frontend-libs-refactor.md`.  
-Migrar **um bloco por vez**, validar manualmente, marcar o checklist e só então avançar.
+**Status: concluída** (refatoração frontend fechada; exceções documentadas em `spec-frontend-libs-refactor.md`).
+
+Passo a passo histórico da migração descrita em `spec-frontend-libs-refactor.md`.  
+Cada bloco foi validado manualmente com `npm run dev` + backend `start:dev`.
 
 **Referências**
 
 - Convenções e gotchas: `spec-frontend-libs-refactor.md`
-- **Inventário o que tem / não tem TanStack Query:** seção *HTTP vs TanStack Query* em `spec-frontend-libs-refactor.md`
+- Inventário HTTP vs TSQ: seção *HTTP vs TanStack Query* em `spec-frontend-libs-refactor.md`
 - API / negócio: `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md`
-- Piloto de leitura pública: `hooks/use-exam-results.ts` + `app/resultados/page.tsx`
-- Piloto ADM autenticado: `hooks/use-exam-participants.ts` + `authAxiosRequest` de `@/lib/api`
+- Piloto público: `hooks/use-exam-results.ts` + `app/resultados/page.tsx`
+- Piloto ADM: `hooks/use-exam-participants.ts` + `authAxiosRequest` de `@/lib/api`
 
 ---
 
-## Estado atual (baseline)
+## Estado final
 
 | Status | Área | Arquivos principais |
 |--------|------|---------------------|
 | Feito | Fundação Query | `components/providers.tsx`, `app/layout.tsx` |
-| Feito | Resultados públicos (lista) | `hooks/use-exam-results.ts`, `app/resultados/page.tsx` |
-| Feito | Resultados públicos (por prova) | `hooks/use-exam-ranking.ts`, `app/resultados/[examId]/page.tsx` |
-| Feito | Participantes ADM | `hooks/use-exam-participants.ts`, `app/manage/[examId]/participantes/page.tsx` |
-| Feito | Questões ADM (RHF + Zod) | `hooks/use-exam-questions.ts`, `app/manage/[examId]/questoes/page.tsx` |
-| Feito | Detalhe aluno (sheet) | `hooks/use-student-detail.ts`, `components/rank-student-sheet.tsx` |
-| Feito | Lista de provas ADM | `hooks/use-exams.ts`, `app/manage/page.tsx` |
-| Feito | HTTP (`lib/api.ts`) | `tryRefresh`, `authAxiosRequest`, `publicAxiosRequest`; `@/lib/auth-axios` reexport deprecated |
-| Parcial | TanStack Query | 18 hooks; Passos 3–6 feitos |
-| Pendente | layouts RSC polish (Passo 7) | ver passos abaixo |
+| Feito | Resultados públicos | `use-exam-results`, `use-exam-ranking` |
+| Feito | Participantes ADM + DataTable | `use-exam-participants`, `participantes/columns.tsx` |
+| Feito | Questões ADM (RHF + dirty) | `use-exam-questions`, `questoes/page.tsx` |
+| Feito | Ranking ADM + status | `use-admin-exam-results`, `use-update-exam-status` |
+| Feito | Create / edit prova + sidebar | `use-create-exam`, `use-exam-detail`, `use-aplicadores` |
+| Feito | Fluxo aplicador | `use-aplicador-me`, `use-presentes`, `use-participant-answers`, `use-bulk-answers` |
+| Feito | Logins RHF | `use-adm-login`, `use-aplicador-login`, `use-in-progress-exams` |
+| Feito | HTTP | `lib/api.ts`, `lib/auth-token.ts` |
+| Aceito | Layouts título (RSC) | `manage/[examId]/layout.tsx`, `aplicar/[examId]/layout.tsx` — Axios no server, sem TSQ |
+
+**18 hooks** com `useQuery` / `useMutation`. Sem `fetch()` nem `authFetch` em `app/` e `components/`.
 
 ---
 
 ## Passo 1 — `lib/api.ts` e auth unificada
 
-**Status: feito** (implementação via `axiosHttp` + retry 401, não `axios.create` interceptors — equivalente funcional).
+**Status: feito** (`axiosHttp` + retry 401 em 401).
 
-### Tarefas restantes (opcional)
-
-- [x] Criar `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid` (skew ~30s), reutilizar nos logins
-- [ ] Evoluir para `axios.create` + interceptors se quiser alinhar 100% à spec “empresa”
-
-### Critério de pronto (atingido)
-
-- HTTP em `@/lib/api`; `lib/auth-fetch.ts` removido; imports novos usam `@/lib/api`
+- [x] `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid`
+- [ ] *(opcional, não feito)* `axios.create` + interceptors — equivalente funcional hoje
 
 ---
 
-## Passo 2 — Lista de provas (`GET /exams`)
+## Passo 2 — Lista de provas
 
-**Status: feito** (`use-exams`, `manage/page`, create via `use-create-exam`).
-
-### Tarefas restantes
-
-- [x] `useExams`: tipar `useQuery<Exam[], Error>`; tipo `Exam` de `@/app/manage/columns`
-- [x] Tratar `isError` na UI (hoje só `isLoading`)
-- [x] `create-exam-dialog`: mutation `POST /exams` + `invalidateQueries({ queryKey: examsQueryKey })` — remover `onCreated={refetch}` quando invalidação estiver no dialog (Passo 4)
-
-### Critério de pronto
-
-- Criar prova atualiza a tabela sem `fetch` manual no dialog
+**Status: feito** — `use-exams`, `use-create-exam`, invalidação `examsQueryKey`.
 
 ---
 
-## Passo 3 — Ranking ADM e status da prova
+## Passo 3 — Ranking ADM e status
 
-**Status: feito** (`hooks/use-admin-exam-results.ts`, `hooks/use-update-exam-status.ts`, `app/manage/[examId]/page.tsx`).
-
-**Objetivo:** substituir `useEffect` + `authFetch` em `app/manage/[examId]/page.tsx`.
-
-### Criar hooks (sugestão de nomes)
-
-- `hooks/use-admin-exam-results.ts` (ou `use-exam-admin-ranking.ts`)
-  - `adminExamResultsQueryKey(examId)` → `["exam-admin-results", examId]`
-  - `GET /exams/:examId/results` → `RankingResponse` (`lib/ranking-types.ts`)
-  - `useAdminExamResults(examId)`
-- `hooks/use-update-exam-status.ts`
-  - `PATCH /exams/:examId/status` com `{ status }`
-  - `onSuccess`: invalidar `adminExamResultsQueryKey(examId)` e `examsQueryKey`
-
-### Arquivos a alterar
-
-- [x] `app/manage/[examId]/page.tsx` — consumir hooks; remover `requestRanking`, `fetchRanking`, estados manuais de loading/erro onde o Query cobrir
-- [x] Manter `RankStudentSheet` + `useStudentDetail` (já em Query)
-
-### Critério de pronto
-
-- Abrir painel da prova: ranking carrega via Query
-- Iniciar / encerrar prova via mutation; lista e ranking coerentes após invalidação
-- Export Excel após encerrar continua funcionando
+**Status: feito** — `use-admin-exam-results`, `use-update-exam-status`, `manage/[examId]/page.tsx`.
 
 ---
 
 ## Passo 4 — Sidebar, criar e editar prova
 
-**Status: feito** (`use-aplicadores`, `use-create-exam`, `use-exam-detail`, dialogs + sidebar).
-
-**Objetivo:** ADM no layout da prova sem `fetch`/`authFetch` solto.
-
-### Hooks / mutations sugeridos
-
-- `hooks/use-aplicadores.ts` — `GET /aplicadores?provaId=`, `PATCH /aplicadores/:id/status`
-- `hooks/use-create-exam.ts` — `POST /exams` (ou mutation dentro de `use-exams.ts`)
-- `hooks/use-exam-detail.ts` — `GET` / `PUT` / `PATCH` `/exams/:examId` para o dialog de edição
-
-### Arquivos
-
-- [x] `components/app-sidebar.tsx` — lista aplicadores, aprovar/rejeitar, logout (logout pode ficar utilitário em `lib/auth.ts`)
-- [x] `components/create-exam-dialog.tsx` — mutation + Zod (`lib/exam-schema.ts`) + RHF
-- [x] `components/edit-exam-dialog.tsx` — Query para carregar + mutations para salvar/excluir
-- [x] `app/manage/data-table.tsx` — `onCreated` opcional após invalidação global de `examsQueryKey`
-
-### Critério de pronto
-
-- Fluxo criar/editar prova e aprovar aplicador na sidebar sem `authFetch`
+**Status: feito** — dialogs RHF + `use-aplicadores`; `logoutSession` em sidebar/header.
 
 ---
 
-## Passo 5 — Fluxo aplicador (`aguardando` + `aplicar/*`)
+## Passo 5 — Fluxo aplicador
 
-**Status: feito** (`use-aplicador-me`, `use-presentes`, `use-participant-answers`, `use-bulk-answers` + páginas aplicador).
-
-**Objetivo:** mesma stack; rotas autenticadas com Bearer (aplicador pode não ter `refresh_token` — tratar 401 com redirect login).
-
-### Hooks sugeridos (agrupar por domínio)
-
-- `hooks/use-aplicador-me.ts` — polling ou refetch em `aguardando` (`GET /aplicadores/me`, status da fila)
-- `hooks/use-aplicar-exam-questions.ts` — `GET /exams/:examId/questions` (hoje `fetch` sem auth em partes)
-- `hooks/use-presentes.ts` — `GET .../participants/presentes`
-- `hooks/use-bulk-answers.ts` — `POST .../answers/bulk`
-- Redação: `hooks/use-participant-redacao.ts` ou reutilizar padrão de `use-student-detail` se endpoint compatível
-
-### Arquivos
-
-- [x] `app/aguardando/page.tsx`
-- [x] `app/manage/aplicar/[examId]/page.tsx`
-- [x] `app/manage/aplicar/[examId]/[participantId]/page.tsx`
-- [x] `app/manage/aplicar/[examId]/redacao/page.tsx`
-- [x] `components/aplicar-logout-button.tsx` — já usa `logoutSession` (sem mudança)
-
-### Critério de pronto
-
-- Aplicador: login → aguardando → aplicar cartão → salvar respostas/redação sem `authFetch`/`fetch` manual
-- `lib/use-aplicar-auth.ts` pode continuar só com JWT no client (sem HTTP)
+**Status: feito** — `aguardando` + `manage/aplicar/*` (questões reutilizam `use-exam-questions`).
 
 ---
 
-## Passo 6 — Formulários de login (RHF + Zod) + participantes (DataTable)
+## Passo 6 — Logins RHF + participantes DataTable
 
-**Status: feito** (logins RHF + `participantes/columns.tsx` + `DataTable` generalizado).
-
-**Objetivo:** alinhar aos dialogs já migrados (`add-participants-dialog`, questões).
-
-### Arquivos
-
-- [x] `components/login-form.tsx` — `useForm` + `zodResolver`; `use-adm-login`
-- [x] `components/aplicador-login-form.tsx` — RHF; `use-in-progress-exams`; `use-aplicador-login`
-- [x] `lib/login-schema.ts`
-- [x] `lib/auth-token.ts` — `decodeJwtPayload`, `isAccessTokenValid`
-- [x] `app/manage/[examId]/participantes/` — `columns.tsx` + `DataTable` (filtro client-side)
-
-### Critério de pronto
-
-- Login ADM e aplicador com mesma UX; redirect automático se token válido no mount
+**Status: feito**.
 
 ---
 
-## Passo 7 — Por último: layouts RSC e polish
+## Passo 7 — Questões ADM + polish
 
-**Objetivo:** decidir se metadados de prova no layout continuam em Server Component ou viram client + Query.
+**Status: feito (escopo libs-refactor).**
 
-### Arquivos
+- [x] Questões: mutations invalidam `exam-questions`, `exam-detail`, `exam-admin-results`
+- [x] Critério: sem `authFetch` / `fetch(` manual em `app/` e `components/`
+- [x] `header_adm.tsx` / `aplicar-logout-button` — `logoutSession` de `@/lib/api`
+- [x] Tabela Progresso em `spec-frontend-libs-refactor.md` atualizada
 
-- [ ] `app/manage/[examId]/layout.tsx` — hoje `fetch` server `GET /exams/:examId`
-- [ ] `app/manage/aplicar/[examId]/layout.tsx` — idem
-- [ ] `components/header_adm.tsx` — logout via util compartilhado
+**Layouts RSC (polish opcional, não bloqueante):**
 
-**Opções**
-
-1. Manter RSC `fetch` só para título/metadata (sem Query).
-2. Client wrapper com `useExamDetail(examId)` e skeleton no layout.
-
-### Extras (spec original)
-
-- [x] Participantes: `DataTable` + colunas (feito no Passo 6)
-- [ ] `lib/query-keys.ts` — centralizar factories (`examsQueryKey`, etc.) quando a maioria dos hooks existir
-- [ ] Atualizar tabela “Progresso” em `spec-frontend-libs-refactor.md`
-
-### Critério de pronto
-
-- Nenhum `grep 'authFetch'` / `fetch(\`\${base}`` em `app/` e `components/` exceto `lib/*` e testes
-- `npm run lint` e `npm run build` limpos
+- [x] Decisão: **manter RSC** + `publicAxiosRequest` para título no header (sem TSQ)
+- [ ] *(futuro)* Client + `useExamDetail` se título precisar sincronizar após editar prova sem refresh
+- [ ] *(futuro)* `lib/query-keys.ts` — centralizar factories (hoje cada hook exporta sua key)
 
 ---
 
-## Checklist rápido por arquivo (pendentes)
-
-Use como mapa ao fechar o Passo 7:
-
-| Arquivo | Passo |
-|---------|-------|
-| `lib/api.ts`, `lib/auth-token.ts` | 1 |
-| `hooks/use-exams.ts`, `app/manage/page.tsx` | 2 (revisão) |
-| `app/manage/[examId]/page.tsx` | 3 |
-| `components/app-sidebar.tsx` | 4 |
-| `components/create-exam-dialog.tsx` | 4 |
-| `components/edit-exam-dialog.tsx` | 4 |
-| `app/aguardando/page.tsx` | 5 |
-| `app/manage/aplicar/**` | 5 |
-| `components/login-form.tsx` | 6 |
-| `components/aplicador-login-form.tsx` | 6 |
-| `app/manage/[examId]/layout.tsx`, `app/manage/aplicar/[examId]/layout.tsx` | 7 |
-| `components/header_adm.tsx`, `components/aplicar-logout-button.tsx` | 4 / 7 |
-
----
-
-## Ordem resumida (não pular)
+## Ordem resumida (histórico)
 
 1. Infra Axios + token  
-2. Lista provas (fechar create + invalidação)  
+2. Lista provas  
 3. Ranking ADM + status  
 4. Sidebar + create/edit exam  
 5. Aplicador  
-6. Logins RHF  
-7. Layouts RSC + polish  
-
-Cada passo deve deixar o app utilizável em produção local (`npm run dev` + backend `start:dev`).
+6. Logins RHF + DataTable participantes  
+7. Questões ADM + critérios de fechamento  

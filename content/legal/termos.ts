@@ -37,8 +37,7 @@ export const termosSections: LegalSection[] = [
     id: "resultados",
     title: "5. Resultados públicos",
     paragraphs: [
-      "O ranking e o detalhamento por questão podem ser exibidos publicamente após o prazo definido pela organização (em geral, dois dias após o encerramento da prova), mediante divulgação do link.",
-      "A exibição de nomes e desempenho segue a Política de Privacidade e o consentimento obtido na inscrição ou nas práticas comunicadas pela Rede.",
+      "Após o prazo definido pela organização (em geral, dois dias após o encerramento da prova), o site pode exibir publicamente os nomes dos 15 melhores colocados. O detalhamento completo do desempenho (notas e questões) é acessado individualmente com código de consulta, conforme a Política de Privacidade.",
     ],
   },
   {

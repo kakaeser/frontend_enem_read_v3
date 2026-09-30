@@ -1,8 +1,8 @@
 # Refatoração frontend — stack de dados e formulários
 
-Documento para continuidade (mentor / estágio): migrar o MVP de `fetch` + `useEffect` + `useState` manual para o padrão usado na empresa.
+**Status: concluída.** MVP migrado de `fetch` + estado manual para Axios + TanStack Query + RHF/Zod onde aplicável. Checklist histórico: `spec-frontend-migration-order.md`.
 
-**Regras de negócio e API:** continuam em `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md`.
+**Regras de negócio e API:** `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md` (não duplicar no frontend — ver `spec-enem-read-v3-mvp.md` como ponteiro).
 
 ## Objetivo
 
@@ -35,8 +35,8 @@ Sem provider, `useQuery` falha em runtime.
 
 ```
 lib/api.ts              # HTTP centralizado (Bearer + tryRefresh em 401); lib/auth-axios.ts só reexport deprecated
-lib/query-keys.ts         # queryKey factories estáveis
-hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.ts)
+hooks/use-*.ts          # queryKey factory + useQuery / useMutation por domínio (18 hooks)
+lib/query-keys.ts       # opcional futuro — hoje keys vivem nos hooks
 ```
 
 - **`queryFn`:** retorna o **corpo útil** (ex.: `Divulgada[]`), não `AxiosResponse` inteiro. Nest costuma devolver JSON direto (array ou objeto), não envelope `{ data: T }` unless DTO explícito.
@@ -49,16 +49,14 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 
 - Query busca **uma vez** (ou refetch) e passa `data={lista}` ao `DataTable`.
 - Filtro “Buscar prova…” em `app/manage/data-table.tsx` usa `columnFilters` do **Table**, não a `queryKey`.
-- Reutilizar `DataTable`; evoluir para `components/data-table.tsx` quando fizer sentido. Participantes ainda usa `<table>` manual — candidato a colunas + `DataTable`.
+- Reutilizar `DataTable` (`app/manage/data-table.tsx`); participantes: `participantes/columns.tsx` + filtro client-side.
 
 ## HTTP (`lib/api`) vs TanStack Query (TSQ)
-
-**Não confundir:** migrar para `@/lib/api` **não** significa que a tela usa TSQ. Muitos arquivos já chamam `authAxiosRequest` / `publicAxiosRequest` com `useEffect` + `useState` local.
 
 | Camada | Status |
 |--------|--------|
 | HTTP centralizado | **Feito** — `lib/api.ts` |
-| TSQ em todas as leituras/escritas de API | **Parcial** — ver inventário abaixo |
+| TSQ em leituras/escritas de API (client) | **Feito** — 18 hooks; exceções abaixo |
 
 ### Com TSQ (`useQuery` / `useMutation` em hooks)
 
@@ -85,51 +83,35 @@ hooks/queries/*.ts        # useQuery / useMutation por domínio (ou hooks/use-*.
 
 **Total:** 18 hooks de domínio com TSQ.
 
-### Sem TSQ (API via `lib/api` + estado manual ou RSC)
+### Exceções aceitas (sem TSQ)
 
-| Arquivo | O que faz hoje | Próximo hook sugerido |
-|---------|----------------|------------------------|
-| ~~`app/manage/[examId]/page.tsx`~~ | — | **Feito** — `use-admin-exam-results`, `use-update-exam-status` |
-| ~~`components/create-exam-dialog.tsx`~~ | — | **Feito** — `use-create-exam` + RHF |
-| ~~`components/edit-exam-dialog.tsx`~~ | — | **Feito** — `use-exam-detail` |
-| ~~`components/app-sidebar.tsx`~~ | — | **Feito** — `use-aplicadores` |
-| ~~`app/aguardando/page.tsx`~~ | — | **Feito** — `use-aplicador-me` |
-| ~~`app/manage/aplicar/[examId]/page.tsx`~~ | — | **Feito** — `use-presentes` + `use-exam-questions` |
-| ~~`app/manage/aplicar/.../[participantId]/page.tsx`~~ | — | **Feito** — answers + `use-bulk-answers` |
-| ~~`app/manage/aplicar/.../redacao/page.tsx`~~ | — | **Feito** — `usePatchPresenteRedacao` |
-| ~~`components/aplicador-login-form.tsx`~~ | — | **Feito** — `use-in-progress-exams`, `use-aplicador-login` + RHF |
-| ~~`components/login-form.tsx`~~ | — | **Feito** — `use-adm-login` + RHF; redirect no mount |
-| `app/manage/[examId]/layout.tsx` | `GET /exams/:id` no **Server Component** | Manter RSC ou client + `useExamDetail` (decisão no Passo 7) |
-| `app/manage/aplicar/[examId]/layout.tsx` | Idem título da prova (RSC) | Idem |
+| Arquivo | Comportamento |
+|---------|----------------|
+| `app/manage/[examId]/layout.tsx` | RSC: `publicAxiosRequest` `GET /exams/:id` só para título no header |
+| `app/manage/aplicar/[examId]/layout.tsx` | Idem |
+| `lib/api.ts` | `tryRefresh`, `logoutSession` — utilitários de sessão |
+| `app/aguardando/page.tsx` | Após aprovação, `loginAplicadorAndStoreToken` (Axios imperativo) antes do redirect; polling = TSQ (`useAplicadorApprovalPoll`) |
 
-### Sem TSQ e sem API (não entram no inventário de dados)
+### Sem HTTP de API (UI / guard)
 
 - `components/login-form.tsx` / `aplicador-login-form.tsx` — parte do `useEffect` é só redirect com JWT no client.
-- `app/manage/[examId]/questoes/page.tsx` — `useEffect` para dirty/RHF/localStorage, **não** para fetch (fetch = `useExamQuestions`).
+- `app/manage/[examId]/questoes/page.tsx` — `useEffect` para dirty/RHF; leitura = `useExamQuestions`.
 - `lib/use-aplicar-auth.ts` — guard de rota (JWT decode), sem HTTP.
 - `components/landing-carousel.tsx`, `components/ui/sidebar.tsx` — UI.
 
-### Ordem sugerida para fechar TSQ
+Detalhe passo a passo (histórico, todos feitos): `spec-frontend-migration-order.md`.
 
-1. Ranking ADM — `manage/[examId]/page.tsx`
-2. Create/edit exam — dialogs + invalidação `examsQueryKey`
-3. Sidebar aplicadores
-4. Fluxo `aplicar/*` + `aguardando`
-5. Login aplicador — lista de provas em `useQuery`
+## Ordem incremental (histórico — todos feitos)
 
-Detalhe passo a passo: `spec-frontend-migration-order.md`.
-
-## Ordem incremental (não migrar tudo de uma vez)
-
-1. **Fundação** — deps, `Providers`, primeiro hook público (feito abaixo).
-2. **`lib/api.ts`** — **Feito** (Axios + refresh JWT); `auth-fetch.ts` removido.
-3. **Queries ADM** — `GET /exams`, ranking, participantes, sidebar aplicadores, fluxo aplicar.
+1. **Fundação** — deps, `Providers`, primeiro hook público.
+2. **`lib/api.ts`** — Axios + refresh JWT; `auth-fetch.ts` removido.
+3. **Queries ADM** — exams, ranking, participantes, sidebar, aplicar.
 4. **Mutations** — criar prova, status, presença, bulk questões/participantes.
-5. **RHF + Zod** — `login-form`, `aplicador-login-form`, `create-exam-dialog`, `edit-exam-dialog`, `add-participants-dialog`.
-6. **Table** — página participantes.
-7. **Por último** — `/manage/[examId]/questoes` (muito estado local / dirty; RHF opcional).
+5. **RHF + Zod** — logins, create/edit prova, add-participants.
+6. **Table** — participantes + `DataTable`.
+7. **Questões ADM** — RHF + dirty; invalidação de cache nas mutations.
 
-## Progresso (atualizar ao migrar)
+## Progresso (final)
 
 **Ordem passo a passo (checklist completo):** `spec-frontend-migration-order.md`.  
 **Inventário HTTP vs TSQ (lista completa):** seção [HTTP vs TanStack Query](#http-libapi-vs-tanstack-query-tsq) acima.
@@ -137,10 +119,11 @@ Detalhe passo a passo: `spec-frontend-migration-order.md`.
 | Área | HTTP (`api`) | TSQ | Notas |
 |------|--------------|-----|--------|
 | `GET /resultados` lista | Feito | Feito | `use-exam-results` |
-| `GET /resultados/:examId` | Feito | Feito | `use-exam-ranking`, 403 → `ResultadosBlockError` |
+| `GET /resultados/:examId` (top 15) | Feito | Feito | `use-exam-ranking`, 403 → `ResultadosBlockError` |
+| `POST /resultados/:examId/consulta` | Feito | Feito | `use-resultados-consulta` + RHF/Zod dialog |
 | `GET /exams` lista | Feito | Feito | `use-exams` |
 | Participantes ADM | Feito | Feito | `use-exam-participants` |
-| Questões ADM | Feito | Feito | `use-exam-questions` + RHF na página |
+| Questões ADM | Feito | Feito | `use-exam-questions` + RHF; bulk/delete invalidam cache relacionado |
 | Detalhe aluno (sheet) | Feito | Feito | `use-student-detail` |
 | Ranking ADM + status prova | Feito | Feito | `use-admin-exam-results`, `use-update-exam-status` |
 | Create / edit / delete prova | Feito | Feito | `use-create-exam`, `use-exam-detail` + RHF |
@@ -162,4 +145,6 @@ Detalhe passo a passo: `spec-frontend-migration-order.md`.
 - `AxiosPromise<T>` = `Promise<AxiosResponse<T>>`; se retornar `response.data`, tipar `Promise<T>`.
 - Não usar `query.data?.data` quando a API retorna array na raiz.
 - Não desmontar `DataTable` em `isFetching` de background — perde filtro digitado na tabela.
+- Questões ADM: hidratar form uma vez por `examId` (`hydratedExamId`); refetch após mutation não reseta itens dirty. Validação Zod só no “Salvar”, não `zodResolver` no `useForm` inteiro.
 - `npm audit` high em `xlsx` (export ranking) — assunto separado da stack Query.
+- Sem `fetch()` / `authFetch` em `app/` e `components/` — HTTP via `@/lib/api`.

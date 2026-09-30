@@ -1,16 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { StudentDetail } from "@/lib/student-detail"
 import { authAxiosRequest } from "@/lib/api"
-import { examRankingQueryKey, getParticipantResult } from "@/hooks/use-exam-ranking"
+import { adminExamResultsQueryKey } from "@/hooks/use-admin-exam-results"
 
-export type StudentDetailSource = "public" | "admin"
+export type StudentDetailSource = "admin"
 
 export function studentDetailQueryKey(
-  source: StudentDetailSource,
   examId: string,
   participantId: number
 ) {
-  return ["student-detail", source, examId, participantId] as const
+  return ["student-detail", "admin", examId, participantId] as const
 }
 
 async function getAdminParticipantResult(
@@ -25,32 +24,19 @@ async function getAdminParticipantResult(
   )
 }
 
-export async function fetchStudentDetail(
-  source: StudentDetailSource,
-  examId: string,
-  participantId: number,
-  signal?: AbortSignal
-): Promise<StudentDetail> {
-  if (source === "public") {
-    return getParticipantResult(examId, participantId, signal)
-  }
-  return getAdminParticipantResult(examId, participantId, signal)
-}
-
 export function useStudentDetail(
-  source: StudentDetailSource,
   examId: string,
-  participantId: number | null
+  participantId: number | null,
+  options?: { enabled?: boolean }
 ) {
   return useQuery<StudentDetail, Error>({
-    queryKey: studentDetailQueryKey(
-      source,
-      examId,
-      participantId ?? 0
-    ),
+    queryKey: studentDetailQueryKey(examId, participantId ?? 0),
     queryFn: ({ signal }) =>
-      fetchStudentDetail(source, examId, participantId!, signal),
-    enabled: participantId !== null && Boolean(examId),
+      getAdminParticipantResult(examId, participantId!, signal),
+    enabled:
+      (options?.enabled ?? true) &&
+      participantId !== null &&
+      Boolean(examId),
   })
 }
 
@@ -81,11 +67,27 @@ export function usePatchParticipantRedacao(
     onSuccess: () => {
       if (participantId !== null) {
         queryClient.invalidateQueries({
-          queryKey: studentDetailQueryKey("admin", examId, participantId),
+          queryKey: studentDetailQueryKey(examId, participantId),
         })
       }
-      queryClient.invalidateQueries({ queryKey: examRankingQueryKey(examId) })
+      queryClient.invalidateQueries({ queryKey: adminExamResultsQueryKey(examId) })
       options?.onSuccess?.()
     },
   })
+}
+
+export function studentDetailFromRanking(
+  detail: StudentDetail
+): import("@/lib/ranking-types").RankingEntry {
+  const acertos = detail.questoes.filter((q) => q.acertou).length
+  return {
+    participantId: detail.participant.id,
+    nome: detail.participant.nome,
+    ponderada: detail.notas.ponderada,
+    redacao: detail.notas.redacao,
+    total: detail.notas.total,
+    acertos,
+    respondidas: detail.questoes.length,
+    totalQuestoes: detail.questoes.length,
+  }
 }

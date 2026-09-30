@@ -5,6 +5,7 @@ import type { ParticipantPayload } from "@/lib/participant-schema"
 export type ExamParticipant = {
   id: number
   nome: string
+  consultaCode: string
   presenca: boolean
 }
 

@@ -1,10 +1,9 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { axiosHttp } from "@/lib/api"
-import type { RankingResponse } from "@/lib/ranking-types"
-import type { StudentDetail } from "@/lib/student-detail"
+import type { PublicExamResults } from "@/lib/public-results-types"
 
 export function examRankingQueryKey(examId: string) {
-  return ["exan-ranking", examId] as const
+  return ["exam-public-results", examId] as const
 }
 
 export class ResultadosBlockError extends Error {
@@ -14,11 +13,11 @@ export class ResultadosBlockError extends Error {
   }
 }
 
-export async function getExamRanking(
+export async function getPublicExamResults(
   examId: string,
   signal?: AbortSignal
-): Promise<RankingResponse> {
-  const { data, status } = await axiosHttp<RankingResponse>(
+): Promise<PublicExamResults> {
+  const { data, status } = await axiosHttp<PublicExamResults>(
     "GET",
     `/resultados/${examId}`,
     { signal, auth: false }
@@ -30,29 +29,10 @@ export async function getExamRanking(
   return data
 }
 
-export async function getParticipantResult(
-  examId: string,
-  participantId: number,
-  signal?: AbortSignal
-): Promise<StudentDetail> {
-  const { data, status } = await axiosHttp<StudentDetail>(
-    "GET",
-    `/resultados/${examId}/${participantId}`,
-    { signal, auth: false }
-  )
-  if (status === 403) throw new ResultadosBlockError()
-  if (status < 200 || status >= 300) {
-    throw new Error(
-      "Não foi possivel carregar as respostas desse participante"
-    )
-  }
-  return data
-}
-
 export function useExamRanking(examId: string) {
-  return useQuery<RankingResponse, Error>({
+  return useQuery<PublicExamResults, Error>({
     queryKey: examRankingQueryKey(examId),
-    queryFn: ({ signal }) => getExamRanking(examId, signal),
+    queryFn: ({ signal }) => getPublicExamResults(examId, signal),
     enabled: Boolean(examId),
   })
 }

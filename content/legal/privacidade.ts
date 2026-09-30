@@ -50,7 +50,7 @@ export const privacidadeSections: LegalSection[] = [
     id: "publico",
     title: "6. Dados visíveis ao público",
     paragraphs: [
-      "Após a liberação da divulgação, visitantes sem login podem ver ranking com nomes completos, pontuações e, ao expandir um participante, detalhes por questão (enunciado, alternativas, resposta marcada e gabarito).",
+      "Após a liberação da divulgação, visitantes sem login podem ver os nomes dos 15 melhores colocados (sem notas na lista pública). Demais participantes acessam o próprio resultado com o código de consulta entregue pela organização; nesse acesso individual podem ver notas e detalhes por questão (enunciado, alternativas, resposta marcada e gabarito).",
       "Essa publicação está alinhada ao consentimento informado na inscrição ou à comunicação da Rede aos participantes e responsáveis.",
     ],
   },

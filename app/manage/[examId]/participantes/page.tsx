@@ -25,7 +25,8 @@ import { createParticipantColumns } from "./columns"
 export default function ParticipantesPage() {
   const { examId } = useParams<{ examId: string }>()
   const { data: participants = [], isLoading, isError } = useExamParticipants(examId)
-  const presencaMutation = useUpdateParticipantPresenca(examId)
+  const { mutate: mutatePresenca, isPending: presencaPending, variables: presencaVariables } =
+    useUpdateParticipantPresenca(examId)
   const deleteMutation = useDeleteParticipant(examId)
 
   const [actionError, setActionError] = useState<string | null>(null)
@@ -33,13 +34,12 @@ export default function ParticipantesPage() {
 
   const presentes = participants.filter((p) => p.presenca).length
 
-  const togglingId =
-    presencaMutation.isPending ? presencaMutation.variables?.id : undefined
+  const togglingId = presencaPending ? presencaVariables?.id : undefined
 
   const togglePresenca = useCallback(
     (p: ExamParticipant) => {
       setActionError(null)
-      presencaMutation.mutate(
+      mutatePresenca(
         { id: p.id, presenca: !p.presenca },
         {
           onError: (e) => {
@@ -52,7 +52,7 @@ export default function ParticipantesPage() {
         }
       )
     },
-    [presencaMutation]
+    [mutatePresenca]
   )
 
   function confirmDelete() {
@@ -127,6 +127,9 @@ export default function ParticipantesPage() {
           toolbarEnd={<AddParticipantsDialog examId={examId} />}
           searchPlaceholder="Buscar aluno…"
           emptyMessage="Nenhum participante encontrado."
+          showHeader={false}
+          tableBorderClassName="border-read-ink"
+          tableBodyClassName="bg-read-ink-dark divide-y divide-read-ink"
         />
       )}
 

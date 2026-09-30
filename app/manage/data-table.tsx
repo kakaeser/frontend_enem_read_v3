@@ -6,7 +6,7 @@ import { useTable, type ColumnDef, type RowData, type SortingState, type ColumnF
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
-import { CreateExamDialog } from "@/components/create-exam-dialog"
+import { cn } from "@/lib/utils"
 import { features, type DataTableFeatures } from "./data-table-features"
 
 interface DataTableProps<TData extends RowData> {
@@ -17,6 +17,9 @@ interface DataTableProps<TData extends RowData> {
   searchPlaceholder?: string
   filterColumnId?: string
   emptyMessage?: string
+  showHeader?: boolean
+  tableBorderClassName?: string
+  tableBodyClassName?: string
 }
 
 export function DataTable<TData extends RowData>({
@@ -27,6 +30,9 @@ export function DataTable<TData extends RowData>({
   searchPlaceholder = "Buscar prova...",
   filterColumnId = "nome",
   emptyMessage = "Nenhuma prova encontrada.",
+  showHeader = true,
+  tableBorderClassName = "border-read-green",
+  tableBodyClassName,
 }: DataTableProps<TData>) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -42,6 +48,7 @@ export function DataTable<TData extends RowData>({
   })
 
   const filterColumn = table.getColumn(filterColumnId)
+  const rowNavigation = Boolean(rowHref)
 
   return (
     <div className="flex flex-col gap-4">
@@ -55,39 +62,42 @@ export function DataTable<TData extends RowData>({
             className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
           />
         </div>
-        {toolbarEnd ?? <CreateExamDialog />}
+        {toolbarEnd}
       </div>
-      <div className="overflow-hidden rounded-lg border border-read-green">
+      <div className={cn("overflow-hidden rounded-lg border", tableBorderClassName)}>
         <Table>
-          <TableHeader className="bg-read-logo-dark">
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="hover:bg-transparent border-read-dark">
-                {hg.headers.map((header) => (
-                  <TableHead key={header.id} className="text-read-white">
-                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
+          {showHeader && (
+            <TableHeader className="bg-read-logo-dark">
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id} className="hover:bg-transparent border-read-dark">
+                  {hg.headers.map((header) => (
+                    <TableHead key={header.id} className="text-read-white">
+                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+          )}
+          <TableBody className={tableBodyClassName}>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => {
                 const href = rowHref?.(row.original)
+                const rowClass = cn(
+                  "border-read-ink/50",
+                  rowNavigation && href
+                    ? "cursor-pointer hover:bg-read-ink"
+                    : "hover:bg-transparent"
+                )
+                const handleRowClick =
+                  rowNavigation && href
+                    ? () => router.push(href)
+                    : undefined
+
                 return (
-                  <TableRow
-                    key={row.id}
-                    onClick={() => {
-                      if (href) router.push(href)
-                    }}
-                    className={
-                      href
-                        ? "cursor-pointer hover:bg-read-ink border-read-ink/50"
-                        : "border-read-ink/50"
-                    }
-                  >
+                  <TableRow key={row.id} onClick={handleRowClick} className={rowClass}>
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell key={cell.id} className={!showHeader ? "py-2.5" : undefined}>
                         <table.FlexRender cell={cell} />
                       </TableCell>
                     ))}

@@ -30,6 +30,8 @@ export default function ResultadosPage() {
             columns={resultadosColumns}
             data={data}
             rowHref={(row) => `/resultados/${(row as Divulgada).id}`}
+            toolbarEnd={null}
+            searchPlaceholder="Buscar prova divulgada…"
           />
         )}
       </main>

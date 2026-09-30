@@ -1,7 +1,7 @@
 "use client"
 
 import { createColumnHelper } from "@tanstack/react-table"
-import { ArrowUpDown, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { DataTableFeatures } from "@/app/manage/data-table-features"
@@ -20,31 +20,37 @@ export function createParticipantColumns(handlers: ParticipantColumnHandlers) {
 
   return columnHelper.columns([
     columnHelper.accessor("nome", {
-      header: ({ column }) => (
-        <Button
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-8 -ml-3 text-read-white hover:text-read-green"
-        >
-          Nome <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ getValue }) => (
-        <span className="font-medium text-read-white">{getValue() as string}</span>
-      ),
+      header: () => null,
+      cell: ({ row }) => {
+        const p = row.original
+        return (
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="w-48 shrink-0 truncate text-sm font-medium text-read-white sm:w-64">
+              {p.nome}
+            </span>
+            {p.presenca ? (
+              <Badge className="shrink-0 bg-read-green text-read-logo-dark">presente</Badge>
+            ) : (
+              <Badge className="shrink-0 bg-read-ink text-read-gray">ausente</Badge>
+            )}
+          </div>
+        )
+      },
       filterFn: "includesString",
     }),
-    columnHelper.accessor("presenca", {
-      header: () => <span className="text-read-white">Presença</span>,
-      cell: ({ getValue }) =>
-        getValue() ? (
-          <Badge className="bg-read-green text-read-logo-dark">presente</Badge>
-        ) : (
-          <Badge className="bg-read-ink text-read-gray">ausente</Badge>
-        ),
+    columnHelper.accessor("consultaCode", {
+      header: () => (
+        <span className="text-read-white whitespace-nowrap">Código consulta</span>
+      ),
+      cell: ({ getValue }) => (
+        <span className="font-mono text-sm text-read-gray tabular-nums">
+          {getValue() as string}
+        </span>
+      ),
     }),
     columnHelper.display({
-      id: "actions",
-      header: () => <span className="text-read-white">Ações</span>,
+      id: "rowActions",
+      header: () => null,
       cell: ({ row }) => {
         const p = row.original
         return (
@@ -52,6 +58,7 @@ export function createParticipantColumns(handlers: ParticipantColumnHandlers) {
             <Button
               size="sm"
               variant="outline"
+              type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 onTogglePresenca(p)
@@ -64,6 +71,7 @@ export function createParticipantColumns(handlers: ParticipantColumnHandlers) {
             <Button
               variant="ghost"
               size="icon"
+              type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete(p)

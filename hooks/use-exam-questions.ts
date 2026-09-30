@@ -1,4 +1,6 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { adminExamResultsQueryKey } from "@/hooks/use-admin-exam-results"
+import { examDetailQueryKey } from "@/hooks/use-exam-detail"
 import { authAxiosRequest } from "@/lib/api"
 import type { QuestionBulkPayload } from "@/lib/question-schema"
 
@@ -53,15 +55,34 @@ export function useExamQuestions(examId: string, enabled = true) {
   })
 }
 
+function useInvalidateExamQuestionsRelated(examId: string) {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: examQuestionsQueryKey(examId) })
+    queryClient.invalidateQueries({ queryKey: examDetailQueryKey(examId) })
+    queryClient.invalidateQueries({
+      queryKey: adminExamResultsQueryKey(examId),
+    })
+  }
+}
+
 export function useBulkUpsertExamQuestions(examId: string) {
+  const invalidateRelated = useInvalidateExamQuestionsRelated(examId)
   return useMutation({
     mutationFn: (questions: QuestionBulkPayload[]) =>
       bulkUpsertExamQuestions(examId, questions),
+    onSuccess: () => {
+      invalidateRelated()
+    },
   })
 }
 
 export function useDeleteExamQuestion(examId: string) {
+  const invalidateRelated = useInvalidateExamQuestionsRelated(examId)
   return useMutation({
     mutationFn: (questionId: number) => deleteExamQuestion(examId, questionId),
+    onSuccess: () => {
+      invalidateRelated()
+    },
   })
 }

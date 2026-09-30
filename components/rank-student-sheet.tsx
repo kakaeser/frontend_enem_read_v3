@@ -14,7 +14,6 @@ import { formatTotal } from "@/lib/format"
 import type { RankingEntry } from "@/lib/ranking-types"
 import type { StudentDetail } from "@/lib/student-detail"
 import {
-  type StudentDetailSource,
   usePatchParticipantRedacao,
   useStudentDetail,
 } from "@/hooks/use-student-detail"
@@ -28,7 +27,7 @@ export function RankStudentSheet({
   onSaved,
   editable = true,
   expandableQuestions = false,
-  detailSource = "admin",
+  prefetchedDetail = null,
 }: {
   examId: string
   entry: RankingEntry | null
@@ -36,7 +35,8 @@ export function RankStudentSheet({
   onSaved: () => void
   editable?: boolean
   expandableQuestions?: boolean
-  detailSource?: StudentDetailSource
+  /** Quando definido (ex.: consulta pública), não busca detalhe na API ADM. */
+  prefetchedDetail?: StudentDetail | null
 }) {
   const [redacao, setRedacao] = useState("")
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -45,11 +45,13 @@ export function RankStudentSheet({
 
   const participantId = entry?.participantId ?? null
 
+  const fetchDetail = prefetchedDetail === null
   const {
-    data: detail,
+    data: fetchedDetail,
     isLoading,
     isError: isLoadError,
-  } = useStudentDetail(detailSource, examId, participantId)
+  } = useStudentDetail(examId, participantId, { enabled: fetchDetail })
+  const detail = prefetchedDetail ?? fetchedDetail
 
   const saveRedacaoMutation = usePatchParticipantRedacao(
     examId,

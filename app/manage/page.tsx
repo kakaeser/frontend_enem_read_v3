@@ -1,6 +1,7 @@
 "use client"
 
 import HeaderAdm from "@/components/header_adm"
+import { CreateExamDialog } from "@/components/create-exam-dialog"
 import { DataTable } from "./data-table"
 import { columns} from "./columns"
 import { useExams } from "@/hooks/use-exams"
@@ -24,6 +25,7 @@ export default function ManagePage() {
             columns={columns}
             data={data ?? []}
             rowHref={(row) => `/manage/${row.id}`}
+            toolbarEnd={<CreateExamDialog />}
           />
         )}
       </main>
