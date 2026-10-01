@@ -124,7 +124,7 @@ export function CreateExamDialog() {
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              className="border-read-ink bg-transparent text-read-white hover:bg-read-ink"
+              className="border-read-ink bg-transparent text-read-white hover:bg-read-ink hover:text-read-white transition-colors"
             >
               Cancelar
             </Button>
