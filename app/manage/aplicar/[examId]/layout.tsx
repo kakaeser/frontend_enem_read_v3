@@ -1,4 +1,5 @@
 import { AplicarLogoutButton } from "@/components/aplicar-logout-button"
+import { publicAxiosRequest } from "@/lib/api"
 
 export default async function AplicarLayout({
   children,
@@ -10,13 +11,14 @@ export default async function AplicarLayout({
   const { examId } = await params
   let examNome: string | null = null
   try {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-    const res = await fetch(`${base}/exams/${examId}`, { cache: "no-store" })
-    if (res.ok) {
-      const data = await res.json()
-      examNome = data.nome ?? null
-    }
-  } catch {}
+    const data = await publicAxiosRequest<{ nome?: string }>(
+      "GET",
+      `/exams/${examId}`
+    )
+    examNome = data.nome ?? null
+  } catch {
+    /* ignore */
+  }
   return (
     <div className="min-h-svh bg-read-darkest text-read-white">
       <header className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-read-ink bg-read-green-dark px-4">

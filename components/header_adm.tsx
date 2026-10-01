@@ -3,24 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { InviteAdmDialog } from "@/components/invite-adm-dialog";
+import { logoutSession } from "@/lib/api";
 
 export default function Header_menu() {
   const router = useRouter();
 
   async function handleLogout() {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030";
-    const refresh = localStorage.getItem("refresh_token");
-    try {
-      if (refresh) {
-        await fetch(`${base}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refresh }),
-        });
-      }
-    } catch {}
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    await logoutSession();
     router.replace("/login");
   }
   return (
@@ -35,7 +25,8 @@ export default function Header_menu() {
           priority
         />
       </Link>
-      <nav className="flex items-center gap-6 text-sm font-medium text-read-white">
+      <nav className="flex items-center gap-4 text-sm font-medium text-read-white sm:gap-6">
+        <InviteAdmDialog />
         <button onClick={handleLogout} className="rounded-full bg-read-green px-5 py-2 text-read-logo-dark font-semibold hover:bg-read-green-dark hover:text-white transition-colors">
           Sair
         </button>

@@ -1,157 +1,109 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams } from "next/navigation"
-import { Search } from "lucide-react"
-import { RankStudentSheet, type StudentDetail } from "@/components/rank-student-sheet"
-import { formatTotal } from "@/lib/format"
-import type { RankingEntry, RankingResponse } from "@/lib/ranking-types"
+import { ConsultaIndividualDialog } from "@/components/consulta-individual-dialog"
+import { RankStudentSheet } from "@/components/rank-student-sheet"
 import Header_menu from "@/components/header_landing"
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
+import { useExamRanking, ResultadosBlockError } from "@/hooks/use-exam-ranking"
+import { studentDetailFromRanking } from "@/hooks/use-student-detail"
+import type { RankingEntry } from "@/lib/ranking-types"
+import type { StudentDetail } from "@/lib/student-detail"
 
 export default function ResultadoExamPage() {
   const { examId } = useParams<{ examId: string }>()
-  const [ranking, setRanking] = useState<RankingEntry[]>([])
-  const [examNome, setExamNome] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [blocked, setBlocked] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<RankingEntry | null>(null)
-  const [search, setSearch] = useState("")
-
-  useEffect(() => {
-    const controller = new AbortController()
-    async function load() {
-      try {
-        const res = await fetch(`${base}/resultados/${examId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        })
-        if (res.status === 403) {
-          setBlocked(true)
-          return
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: RankingResponse = await res.json()
-        setRanking(Array.isArray(data.ranking) ? data.ranking : [])
-        setExamNome(data.exam?.nome ?? null)
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar o ranking.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [examId])
-
-  const fetchDetail = useCallback(
-    async (participantId: number, signal?: AbortSignal): Promise<StudentDetail> => {
-      const res = await fetch(
-        `${base}/resultados/${examId}/${participantId}`,
-        { cache: "no-store", signal }
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    },
-    [examId]
+  const { data, isLoading, isError, error } = useExamRanking(examId)
+  const [entry, setEntry] = useState<RankingEntry | null>(null)
+  const [prefetchedDetail, setPrefetchedDetail] = useState<StudentDetail | null>(
+    null
   )
+
+  const blocked = error instanceof ResultadosBlockError
+  const top15 = Array.isArray(data?.top15) ? data.top15 : []
+  const examNome = data?.exam?.nome ?? null
+  const loadError = isError && !blocked
+
+  function handleConsultaSuccess(detail: StudentDetail) {
+    setPrefetchedDetail(detail)
+    setEntry(studentDetailFromRanking(detail))
+  }
+
+  function closeSheet() {
+    setEntry(null)
+    setPrefetchedDetail(null)
+  }
 
   return (
     <div className="flex min-h-svh flex-col bg-read-darkest text-read-white">
-      <Header_menu></Header_menu>
+      <Header_menu />
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4 pb-8">
         <h1 className="text-xl font-bold">
           {examNome ?? `Prova #${examId}`}
         </h1>
 
-        {!loading && !blocked && !error && ranking.length > 0 && (
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar seu nome…"
-              className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
-            />
-          </div>
-        )}
-
-        {loading && (
+        {isLoading && (
           <p className="text-sm text-read-gray">Carregando ranking…</p>
         )}
 
-        {!loading && blocked && (
+        {!isLoading && blocked && (
           <p className="text-sm text-read-gray">
             Resultados disponíveis 2 dias após o encerramento.
           </p>
         )}
 
-        {!loading && !blocked && error && (
-          <p className="text-sm text-red-400">{error}</p>
+        {loadError && (
+          <p className="text-sm text-red-400">
+            Não foi possível carregar o ranking.
+          </p>
         )}
 
-        {!loading && !blocked && !error && ranking.length === 0 && (
+        {!isLoading && !blocked && !error && top15.length === 0 && (
           <p className="text-sm text-read-gray">
             Nenhum participante neste ranking.
           </p>
         )}
 
-        {!loading && !blocked && !error && ranking.length > 0 && (() => {
-          const visible = ranking.filter((r) =>
-            r.nome.toLowerCase().includes(search.trim().toLowerCase())
-          )
-          if (visible.length === 0) {
-            return (
-              <p className="text-sm text-read-gray">
-                Nenhum aluno encontrado para “{search.trim()}”.
-              </p>
-            )
-          }
-          return (
+        {!isLoading && !blocked && !error && top15.length > 0 && (
+          <>
+            <div className="flex w-full justify-end">
+              <ConsultaIndividualDialog
+                examId={examId}
+                onSuccess={handleConsultaSuccess}
+              />
+            </div>
             <div className="overflow-hidden rounded-lg border border-read-ink bg-read-ink-dark">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-read-ink bg-read-darkest text-left text-xs text-read-gray">
                     <th className="w-12 px-4 py-2.5 font-medium">#</th>
                     <th className="w-full px-2 py-2.5 font-medium">Aluno</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-read-ink">
-                  {visible.map((r) => (
-                    <tr
-                      key={r.participantId}
-                      onClick={() => setSelected(r)}
-                      className="cursor-pointer transition-colors hover:bg-read-ink/40"
-                    >
+                  {top15.map((r) => (
+                    <tr key={`${r.posicao}-${r.nome}`}>
                       <td className="px-4 py-2.5 font-bold text-read-gray tabular-nums">
-                        {ranking.indexOf(r) + 1}
+                        {r.posicao}
                       </td>
                       <td className="max-w-0 w-full truncate px-2 py-2.5 font-medium text-read-white">
                         {r.nome}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-bold text-read-white tabular-nums">
-                        {formatTotal(r)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )
-        })()}
+          </>
+        )}
 
         <RankStudentSheet
           examId={examId}
-          entry={selected}
-          onClose={() => setSelected(null)}
+          entry={entry}
+          onClose={closeSheet}
           onSaved={() => {}}
           editable={false}
           expandableQuestions
-          fetchDetail={fetchDetail}
+          prefetchedDetail={prefetchedDetail}
         />
       </main>
     </div>

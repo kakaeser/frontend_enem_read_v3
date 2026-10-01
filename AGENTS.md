@@ -17,7 +17,7 @@ Refatoração do `enem_read` (FastAPI + SQLAlchemy) para **NestJS + Prisma** (ba
 ```
 enem_read_v3/
   frontend_enem_read_v3/  # este repo — Next.js App Router
-  backend_enem_read_v3/   # NestJS 12 + Prisma 6 + Postgres (Supabase) — irmão, não monorepo workspaces
+  backend_enem_read_v3/   # NestJS 12 + Prisma 6 + Postgres (Neon) + API no Render — irmão, não monorepo workspaces
 ```
 
 Sem workspaces — cada projeto tem seu `package.json`/`node_modules`. Backend path: `../backend_enem_read_v3`.
@@ -25,6 +25,7 @@ Sem workspaces — cada projeto tem seu `package.json`/`node_modules`. Backend p
 ## Stack / Tooling
 
 - Next.js `16.3.3` (App Router), React `19.2.8`, Tailwind CSS `4` via `@tailwindcss/postcss`, TypeScript `5` strict.
+- **Dados / forms:** Axios (`lib/api.ts`), TanStack Query (`components/providers.tsx`), TanStack Table (`app/manage/data-table.tsx`), Zod + React Hook Form — convenções em `.agents/specs/spec-frontend-libs-refactor.md` (**concluída**).
 - ESLint `9` com `eslint-config-next` (core-web-vitals + typescript). Config em `eslint.config.mjs:1`.
 - `postcss.config.mjs:1` — apenas `{"@tailwindcss/postcss": {}}`, não `tailwindcss` direto.
 - Path alias `@/*` → `./*` (`tsconfig.json:22`). Ex: `import x from "@/app/page"`.
@@ -58,7 +59,7 @@ Backend é fonte da verdade. Frontend consome via REST.
 - `Exam` (`exams`, PK `exam_id`): `nome`, `qtdQuestoes`, `notaSimbolica` default 1000, `status` enum `draft|in_progress|completed`, `encerramento`, `createdAt/updatedAt`. 1:N `Participant|Question|Aplicador` cascade.
 - `Adm` (`adms`): `email` unique, `senha` (bcrypt hash), sem `role`.
 - `Aplicador` (`aplicadores`): `nome`, `status` `PENDENTE|APROVADO|REJEITADO`, FK `provaId→Exam` Cascade, `aprovadoPorId?`.
-- `Participant` (`participantes`): `nome`, `presenca` default true, `redacaoNota?`, FK `examId` Cascade + index, `aplicadorId?` SetNull. 1:N `Answer`.
+- `Participant` (`participantes`): `nome`, `consultaCode` (único por prova), `presenca` default true, `redacaoNota?`, FK `examId` Cascade + index, `aplicadorId?` SetNull. 1:N `Answer`.
 - `Question` (`questoes`): `numero`, `peso` default 1, `correctAnswer` (`question_correct_answer`), `enunciado` Text, `alternativas` Json `[{letra,texto}]`, FK `examId` Cascade, `@@unique([examId, numero])`.
 - `Answer` (`resultados`): `alternativa`, `confidenceScore?`, `manuallyReviewed` default false, FK `userId→Participant` Cascade, `questId→Question` Cascade, `@@unique([userId, questId])`. Sem `examId` redundante (normalizado vs legado).
 
@@ -68,26 +69,27 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 
 1. `POST /exams` cria prova + N `Question` placeholders vazias em transaction.
 2. `PUT /exams/:examId/questions/bulk` — upsert em lote (array `{id?, numero, enunciado, alternativas, correctAnswer, peso}`) — cria e edita em 1 request.
-3. `POST /exams/:examId/participants` + `POST .../participants/import` (CSV/Excel) — cadastra participantes.
+3. `POST /exams/:examId/participants` + `POST .../participants/bulk` — cadastra participantes (gera `consultaCode` no servidor).
 4. Gabarito via `Question.correctAnswer` (manual, sem OCR no MVP).
 5. Respostas via `POST /exams/:examId/answers/bulk` (manual, sem OMR), `unique [userId, questId]`.
 6. Nota = `(sum(peso*acerto)/sum(pesos) * notaSimbolica) + redacaoNota` — cálculo estático em `ResultsService`.
-7. `GET /resultados?examId=` público + `GET /exams/:examId/results` (ADM) + `GET /resultados/:participantId` detalhe por questão.
+7. `GET /resultados` lista divulgadas + `GET /resultados/:examId` pódio top 15 + `POST /resultados/:examId/consulta` detalhe por código; `GET /exams/:examId/results` (ADM ranking completo).
 
-## Frontend routes to build (ainda não existem — `app/` só tem `page.tsx`/`layout.tsx`)
+## Frontend routes (MVP + stack Axios/Query/RHF — ver spec-frontend-libs-refactor.md)
 
 - `/` login com toggle ADM (email/senha → `POST /auth/login`) vs Aplicador (nome+provaId → `POST /auth/aplicador`); botão "Entrar como aplicador" só habilita se `GET /exams?status=in_progress` retorna >0.
-- `/resultados` público — só libera se `now >= encerramento + 2 dias` (403 antes, por link divulgado, sem cron). Lista ranking + clique expande detalhe `{numero, enunciado, alternativas, correctAnswer, marcada, acertou, peso}`.
+- `/resultados` público — só libera se `now >= encerramento + 2 dias` (403 antes). Lista provas; `/resultados/[examId]` mostra top 15 (nome) + dialog **Consulta individual** (código) → sheet com detalhe por questão.
 - `/manage/[examId]` — painel ADM: status `draft→in_progress→completed` (popup warning ao encerrar), rank ao vivo + drawer lateral ao clicar aluno (editar `presenca`/`redacaoNota`). Subrotas: `/manage/[examId]/participantes`, `/manage/[examId]/questoes` (edição dinâmica bulk).
-- Auth: JWT Bearer 1h (`JWT_SECRET`/`JWT_EXPIRES_IN` no backend `.env`). Aplicador sem senha, só `APROVADO` + `Exam in_progress` libera.
+- Auth: JWT Bearer 1h (`JWT_SECRET`/`JWT_EXPIRES_IN` no backend `.env`). **ADM:** access só em memória (`lib/adm-session.ts`); refresh em cookie HttpOnly (`POST /auth/refresh` e `/auth/logout` com `withCredentials` no axios). **Aplicador:** JWT no `localStorage`; sem senha, só `APROVADO` + `Exam in_progress` libera. Rotas públicas de convite/reset: `/aceitar-convite`, `/esqueci-senha`, `/redefinir-senha`.
 
-> Conflito atual: briefing pede WebSocket para rank ao vivo no `/manage`; spec MVP em `.agents/specs/spec-enem-read-v3-mvp.md` decidiu **sem WebSocket** (ranking estático, sem `ResultsGateway`). Confirmar com dono antes de implementar Socket.IO.
+> Sem WebSocket no MVP — ranking estático; ver `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md`.
 
 ## Infra / Deploy
 
-- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com o backend via HTTPS (`NEXT_PUBLIC_API_URL`).
-- Backend → **Google Cloud Run** (`PORT` injetado, `Dockerfile` + `gcloud run deploy`; não usar `nest deploy`/`mau`).
-- DB → **Supabase Postgres** — requer `DATABASE_URL` (pooler `:6543?pgbouncer=true`) + `DIRECT_URL` (`:5432`) no `.env` (gitignored). Ver `prisma.config.ts:1` e `.env.example` no backend.
+- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com a API via HTTPS (`NEXT_PUBLIC_API_URL` → URL do Render). Open Graph / `metadataBase`: `NEXT_PUBLIC_SITE_URL` no build (ex.: `https://enemread.com.br`; fallback no código se omitido).
+- Backend → **Render** — NestJS com `PORT` injetado (`process.env.PORT ?? 3030`); deploy via `Dockerfile` (multi-stage) ou build nativo no Render. Env: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`. Detalhes em `../backend_enem_read_v3/AGENTS.md` e `../backend_enem_read_v3/docs/render-keep-alive.md`.
+- DB → **Neon Postgres** (só no backend) — `DATABASE_URL` (pooler) + `DIRECT_URL` (conexão direta / `DATABASE_URL_UNPOOLED`) no `.env` do backend (gitignored). Prisma: `directUrl = env("DIRECT_URL")` em `prisma/schema.prisma`.
+- **CORS + cookies (ADM):** o backend usa `credentials: true` e origens explícitas em `FRONTEND_URL` (lista separada por vírgula). A origem do front em produção (Cloudflare) e `http://localhost:3000` em dev precisam estar na lista; senão login/refresh e links absolutos de e-mail (convite/reset) falham entre domínios.
 
 ## Gotchas
 
@@ -102,4 +104,5 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 
 ## Specs
 
-Fonte de verdade para regras de negócio: `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md` e `spec-tasks.md` (user stories, contratos de API, decisões de schema).
+- **Negócio / API (canônico):** `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md` — ponteiro local: `.agents/specs/spec-enem-read-v3-mvp.md`.
+- **Frontend (concluído):** `.agents/specs/spec-frontend-libs-refactor.md` + histórico `.agents/specs/spec-frontend-migration-order.md`.

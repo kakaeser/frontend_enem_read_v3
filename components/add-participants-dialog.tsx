@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -11,72 +13,48 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { authFetch } from "@/lib/auth-fetch"
-import { participantSchema } from "@/lib/participant-schema"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { useBulkCreateParticipants } from "@/hooks/use-exam-participants"
+import {
+  addParticipantsFormSchema,
+  type AddParticipantsFormValues,
+  parseParticipantNamesFromText,
+} from "@/lib/participant-schema"
 
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
-
-export function AddParticipantsDialog({
-  examId,
-  onAdded,
-}: {
-  examId: string
-  onAdded?: () => void
-}) {
+export function AddParticipantsDialog({ examId }: { examId: string }) {
   const [open, setOpen] = useState(false)
-  const [text, setText] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const bulkCreate = useBulkCreateParticipants(examId)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    const names = text
-      .split("\n")
-      .map((n) => n.trim())
-      .filter(Boolean)
-    if (names.length === 0) {
-      setError("Digite ao menos um nome (um por linha).")
-      return
-    }
-    const invalid = names.filter(
-      (n) => !participantSchema.safeParse({ nome: n }).success
-    )
-    if (invalid.length > 0) {
-      setError(
-        `Nomes com menos de 2 caracteres: ${invalid.slice(0, 3).join(", ")}${
-          invalid.length > 3 ? ` (+${invalid.length - 3})` : ""
-        }`
-      )
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await authFetch(
-        base,
-        `${base}/exams/${examId}/participants/bulk`,
-        {
-          method: "POST",
-          body: JSON.stringify({ participants: names.map((nome) => ({ nome })) }),
-        }
-      )
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.message ?? "Erro ao adicionar participantes")
-      }
-      setOpen(false)
-      setText("")
-      onAdded?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro")
-    } finally {
-      setLoading(false)
+  const form = useForm<AddParticipantsFormValues>({
+    resolver: zodResolver(addParticipantsFormSchema),
+    defaultValues: { text: "" },
+  })
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      form.reset()
+      bulkCreate.reset()
     }
   }
 
+  function onSubmit(values: AddParticipantsFormValues) {
+    const participants = parseParticipantNamesFromText(values.text)
+    bulkCreate.mutate(participants, {
+      onSuccess: () => {
+        handleOpenChange(false)
+      },
+      onError: (err) => {
+        form.setError("root", {
+          message:
+            err instanceof Error ? err.message : "Erro ao adicionar participantes.",
+        })
+      },
+    })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white">
@@ -93,38 +71,42 @@ export function AddParticipantsDialog({
             Um nome por linha. Todos entram como presentes.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.text}>
               <FieldLabel htmlFor="nomes" className="text-read-white">
                 Nomes
               </FieldLabel>
               <textarea
                 id="nomes"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
                 rows={8}
                 placeholder={"Ana Silva\nBruno Souza\nCarla Lima"}
                 className="min-h-32 w-full rounded-lg border border-read-ink bg-read-ink-dark px-3 py-2 text-sm text-read-white placeholder:text-read-gray/40 focus:border-read-green focus:outline-none"
+                {...form.register("text")}
               />
+              <FieldError errors={[form.formState.errors.text]} />
             </Field>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {form.formState.errors.root && (
+              <p className="text-sm text-red-400">
+                {form.formState.errors.root.message}
+              </p>
+            )}
           </FieldGroup>
           <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
               className="border-read-ink bg-transparent text-read-white hover:bg-read-ink"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              disabled={loading}
+              disabled={bulkCreate.isPending}
               className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white"
             >
-              {loading ? "Adicionando..." : "Adicionar"}
+              {bulkCreate.isPending ? "Adicionando…" : "Adicionar"}
             </Button>
           </DialogFooter>
         </form>

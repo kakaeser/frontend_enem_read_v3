@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { Check, Copy, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -15,94 +15,47 @@ import {
 } from "@/components/ui/dialog"
 import { RankStudentSheet } from "@/components/rank-student-sheet"
 import { EditExamDialog } from "@/components/edit-exam-dialog"
-import { authFetch } from "@/lib/auth-fetch"
+import { useAdminExamResults } from "@/hooks/use-admin-exam-results"
+import { useUpdateExamStatus } from "@/hooks/use-update-exam-status"
 import { downloadRankingExcel } from "@/lib/export-ranking"
 import { formatNum, formatTotal } from "@/lib/format"
-import type { RankingEntry, RankingResponse } from "@/lib/ranking-types"
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
+import type { RankingEntry } from "@/lib/ranking-types"
 
 export default function RankingPage() {
   const { examId } = useParams<{ examId: string }>()
-  const [ranking, setRanking] = useState<RankingEntry[]>([])
-  const [stats, setStats] = useState<RankingResponse["stats"] | null>(null)
-  const [exam, setExam] = useState<RankingResponse["exam"] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useAdminExamResults(examId)
+  const updateStatus = useUpdateExamStatus(examId)
+
+  const ranking = Array.isArray(data?.ranking) ? data.ranking : []
+  const stats = data?.stats ?? null
+  const exam = data?.exam ?? null
+
   const [selected, setSelected] = useState<RankingEntry | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [confirmMode, setConfirmMode] = useState<"start" | "end" | null>(null)
-  const [statusLoading, setStatusLoading] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  async function requestRanking(
-    signal?: AbortSignal
-  ): Promise<RankingResponse> {
-    const res = await authFetch(base, `${base}/exams/${examId}/results`, {
-      signal,
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json()
-  }
-
-  const fetchRanking = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await requestRanking()
-      setRanking(Array.isArray(data.ranking) ? data.ranking : [])
-      setStats(data.stats ?? null)
-      setExam(data.exam ?? null)
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return
-      setError("Não foi possível carregar o ranking.")
-      setRanking([])
-      setStats(null)
-    } finally {
-      setLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examId])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    async function initialLoad() {
-      try {
-        const data = await requestRanking(controller.signal)
-        setRanking(Array.isArray(data.ranking) ? data.ranking : [])
-        setStats(data.stats ?? null)
-        setExam(data.exam ?? null)
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar o ranking.")
-      } finally {
-        setLoading(false)
-      }
-    }
-    void initialLoad()
-    return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examId])
+  const statusLoading = updateStatus.isPending
 
   async function confirmStatus() {
     if (!confirmMode) return
     const next = confirmMode === "start" ? "in_progress" : "completed"
-    setStatusLoading(true)
+    const rankingSnapshot = ranking
+    const examName = exam?.nome ?? `Prova #${examId}`
+
     setActionError(null)
     try {
-      const res = await authFetch(base, `${base}/exams/${examId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: next }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.message ?? `HTTP ${res.status}`)
-      }
+      await updateStatus.mutateAsync(next)
       setConfirmMode(null)
-      await fetchRanking()
-      if (next === "completed" && ranking.length > 0) {
+      if (next === "completed" && rankingSnapshot.length > 0) {
         try {
-          downloadRankingExcel(ranking, exam?.nome ?? `Prova #${examId}`)
+          downloadRankingExcel(rankingSnapshot, examName)
         } catch {
           setActionError("Prova encerrada, mas o download do Excel falhou.")
         }
@@ -112,8 +65,6 @@ export default function RankingPage() {
         e instanceof Error ? `Erro ao atualizar: ${e.message}` : "Erro ao atualizar."
       )
       setConfirmMode(null)
-    } finally {
-      setStatusLoading(false)
     }
   }
 
@@ -129,19 +80,23 @@ export default function RankingPage() {
     }
   }
 
+  function refreshRanking() {
+    void refetch()
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold text-read-white">Ranking</h1>
         <div className="ml-auto flex items-center gap-2">
-          {!loading && (
-            <EditExamDialog examId={examId} onSaved={fetchRanking} />
+          {!isLoading && (
+            <EditExamDialog examId={examId} onSaved={refreshRanking} />
           )}
           <Button
             variant="ghost"
             size="icon"
-            onClick={fetchRanking}
-            disabled={loading}
+            onClick={refreshRanking}
+            disabled={isFetching}
             className="h-8 w-8 text-read-gray hover:bg-read-ink hover:text-read-green disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4" />
@@ -151,7 +106,7 @@ export default function RankingPage() {
             variant="ghost"
             size="sm"
             onClick={copyRank}
-            disabled={loading || ranking.length === 0}
+            disabled={isLoading || ranking.length === 0}
             className="text-read-gray hover:bg-read-ink hover:text-read-green disabled:opacity-50"
           >
             {copied ? (
@@ -161,10 +116,10 @@ export default function RankingPage() {
             )}
             {copied ? "Copiado!" : "Copiar rank"}
           </Button>
-          {!loading && exam?.status === "completed" && (
+          {!isLoading && exam?.status === "completed" && (
             <Badge className="bg-read-ink text-read-gray">encerrada</Badge>
           )}
-          {!loading && exam?.status === "draft" && (
+          {!isLoading && exam?.status === "draft" && (
             <Button
               size="sm"
               onClick={() => setConfirmMode("start")}
@@ -173,7 +128,7 @@ export default function RankingPage() {
               Começar prova
             </Button>
           )}
-          {!loading && exam?.status === "in_progress" && (
+          {!isLoading && exam?.status === "in_progress" && (
             <Button
               size="sm"
               onClick={() => setConfirmMode("end")}
@@ -187,11 +142,13 @@ export default function RankingPage() {
 
       {actionError && <p className="text-sm text-red-400">{actionError}</p>}
 
-      {loading && <p className="text-sm text-read-gray">Carregando ranking…</p>}
+      {isLoading && <p className="text-sm text-read-gray">Carregando ranking…</p>}
 
-      {!loading && error && <p className="text-sm text-red-400">{error}</p>}
+      {!isLoading && isError && (
+        <p className="text-sm text-red-400">Não foi possível carregar o ranking.</p>
+      )}
 
-      {!loading && !error && stats && (
+      {!isLoading && !isError && stats && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
             { label: "Média", value: stats.media },
@@ -212,13 +169,13 @@ export default function RankingPage() {
         </div>
       )}
 
-      {!loading && !error && ranking.length === 0 && (
+      {!isLoading && !isError && ranking.length === 0 && (
         <p className="text-sm text-read-gray">
           Nenhum participante presente nesta prova.
         </p>
       )}
 
-      {!loading && !error && ranking.length > 0 && (
+      {!isLoading && !isError && ranking.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-read-ink bg-read-ink-dark">
           <table className="w-full text-sm">
             <thead>
@@ -312,7 +269,7 @@ export default function RankingPage() {
         examId={examId}
         entry={selected}
         onClose={() => setSelected(null)}
-        onSaved={fetchRanking}
+        onSaved={refreshRanking}
       />
     </div>
   )

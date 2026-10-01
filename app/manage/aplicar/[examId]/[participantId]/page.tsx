@@ -14,7 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { authFetch } from "@/lib/auth-fetch"
+import { useBulkAnswers } from "@/hooks/use-bulk-answers"
+import { useExamQuestions } from "@/hooks/use-exam-questions"
+import { useExamPresentes } from "@/hooks/use-presentes"
+import { useParticipantAnswers } from "@/hooks/use-participant-answers"
 import { useAplicarAuth } from "@/lib/use-aplicar-auth"
 
 type Alternativa = { letra: string; texto: string }
@@ -26,13 +29,9 @@ type Question = {
   alternativas: Alternativa[]
 }
 
-type AnswerRow = { questId: number; alternativa: string }
-
 type Draft = { marks: Record<number, string>; lastQ: number | null }
 
 const LETRAS = ["A", "B", "C", "D"]
-
-const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
 function lsKey(examId: string, participantId: string) {
   return `aplicar:${examId}:${participantId}`
@@ -59,6 +58,24 @@ function readDraft(examId: string, participantId: string): Draft {
   }
 }
 
+function toQuestions(
+  raw: {
+    id: number
+    numero: number
+    enunciado: string
+    alternativas: unknown
+  }[]
+): Question[] {
+  return raw.map((q) => ({
+    id: q.id,
+    numero: q.numero,
+    enunciado: q.enunciado,
+    alternativas: Array.isArray(q.alternativas)
+      ? (q.alternativas as Alternativa[])
+      : [],
+  }))
+}
+
 export default function CorretorPage() {
   const { examId, participantId } = useParams<{
     examId: string
@@ -68,99 +85,83 @@ export default function CorretorPage() {
   const searchParams = useSearchParams()
   const ready = useAplicarAuth(examId)
 
+  const {
+    data: rawQuestions = [],
+    isLoading: loadingQuestions,
+    isError: errorQuestions,
+  } = useExamQuestions(examId, ready)
+  const {
+    data: answerRows = [],
+    isLoading: loadingAnswers,
+    isError: errorAnswers,
+  } = useParticipantAnswers(examId, participantId, ready)
+  const { data: presentes = [], isLoading: loadingPresentes } =
+    useExamPresentes(examId, ready)
+
+  const bulkAnswers = useBulkAnswers(examId, participantId)
+
   const [questions, setQuestions] = useState<Question[]>([])
   const [studentName, setStudentName] = useState<string | null>(null)
   const [marks, setMarks] = useState<Record<number, string>>({})
   const [serverMarks, setServerMarks] = useState<Record<number, string>>({})
   const [index, setIndex] = useState(-1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
   const [feedback, setFeedback] = useState<
     { kind: "error" | "success"; message: string } | null
   >(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const initRef = useRef(false)
 
-  useEffect(() => {
-    if (!ready || initRef.current) return
-    initRef.current = true
-    const controller = new AbortController()
-    async function load() {
-      try {
-        const [resQ, resA, resP] = await Promise.all([
-          fetch(`${base}/exams/${examId}/questions`, {
-            cache: "no-store",
-            signal: controller.signal,
-          }),
-          authFetch(
-            base,
-            `${base}/exams/${examId}/answers/participant/${participantId}`,
-            { signal: controller.signal }
-          ),
-          authFetch(base, `${base}/exams/${examId}/participants/presentes`, {
-            signal: controller.signal,
-          }),
-        ])
-        if (!resQ.ok) throw new Error(`HTTP ${resQ.status}`)
-        if (!resA.ok) throw new Error(`HTTP ${resA.status}`)
-        const qs: Question[] = await resQ.json()
-        const as: AnswerRow[] = resA.ok ? await resA.json() : []
-        const serverMarks: Record<number, string> = {}
-        for (const a of as) serverMarks[a.questId] = a.alternativa
-        if (resP.ok) {
-          const list: { id: number; nome: string }[] = await resP.json()
-          setStudentName(
-            list.find((p) => p.id === Number(participantId))?.nome ?? null
-          )
-        }
-        const draft = readDraft(examId, participantId)
-        const merged =
-          Object.keys(draft.marks).length > 0
-            ? { ...serverMarks, ...draft.marks }
-            : serverMarks
-        setQuestions(Array.isArray(qs) ? qs : [])
-        setServerMarks(serverMarks)
-        setMarks(merged)
+  const loading =
+    !ready || loadingQuestions || loadingAnswers || loadingPresentes
+  const error = errorQuestions || errorAnswers
 
-        const total = Array.isArray(qs) ? qs.length : 0
-        const qParam = parseInt(searchParams.get("q") ?? "", 10)
-        let start = 0
-        if (qParam >= 1 && qParam <= total) {
-          start = qParam - 1
-        } else if (
-          draft.lastQ !== null &&
-          draft.lastQ >= 1 &&
-          draft.lastQ <= total
-        ) {
-          start = draft.lastQ - 1
-        } else {
-          const firstBlank = (Array.isArray(qs) ? qs : []).findIndex(
-            (q) => !merged[q.id]
-          )
-          start = firstBlank >= 0 ? firstBlank : 0
-        }
-        setIndex(total > 0 ? start : -1)
-        if (total > 0) {
-          router.replace(`?q=${start + 1}`, { scroll: false })
-          try {
-            localStorage.setItem(
-              lsKey(examId, participantId),
-              JSON.stringify({ marks: merged, lastQ: start + 1 })
-            )
-          } catch {}
-        }
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return
-        setError("Não foi possível carregar a prova.")
-      } finally {
-        setLoading(false)
-      }
+  useEffect(() => {
+    if (!ready || loading || error || initRef.current) return
+    initRef.current = true
+
+    const qs = toQuestions(rawQuestions)
+    const server: Record<number, string> = {}
+    for (const a of answerRows) server[a.questId] = a.alternativa
+    const draft = readDraft(examId, participantId)
+    const merged =
+      Object.keys(draft.marks).length > 0
+        ? { ...server, ...draft.marks }
+        : server
+
+    setStudentName(
+      presentes.find((p) => p.id === Number(participantId))?.nome ?? null
+    )
+    setQuestions(qs)
+    setServerMarks(server)
+    setMarks(merged)
+
+    const total = qs.length
+    const qParam = parseInt(searchParams.get("q") ?? "", 10)
+    let start = 0
+    if (qParam >= 1 && qParam <= total) {
+      start = qParam - 1
+    } else if (
+      draft.lastQ !== null &&
+      draft.lastQ >= 1 &&
+      draft.lastQ <= total
+    ) {
+      start = draft.lastQ - 1
+    } else {
+      const firstBlank = qs.findIndex((q) => !merged[q.id])
+      start = firstBlank >= 0 ? firstBlank : 0
     }
-    void load()
-    return () => controller.abort()
+    setIndex(total > 0 ? start : -1)
+    if (total > 0) {
+      router.replace(`?q=${start + 1}`, { scroll: false })
+      try {
+        localStorage.setItem(
+          lsKey(examId, participantId),
+          JSON.stringify({ marks: merged, lastQ: start + 1 })
+        )
+      } catch {}
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, examId, participantId])
+  }, [ready, loading, error, rawQuestions, answerRows, presentes])
 
   if (!ready) return null
 
@@ -168,6 +169,7 @@ export default function CorretorPage() {
   const current = index >= 0 && index < total ? questions[index] : null
   const answered = questions.filter((q) => marks[q.id]).length
   const blanks = questions.filter((q) => !marks[q.id])
+  const sending = bulkAnswers.isPending
 
   function persist(next: Record<number, string>, lastQ: number) {
     try {
@@ -211,46 +213,38 @@ export default function CorretorPage() {
     } catch {}
   }
 
-  async function send() {
+  function send() {
     if (sending) return
-    setSending(true)
     setFeedback(null)
-    try {
-      const payload = questions
-        .filter((q) => marks[q.id])
-        .map((q) => ({
-          userId: Number(participantId),
-          questId: q.id,
-          alternativa: marks[q.id],
-        }))
-      const res = await authFetch(base, `${base}/exams/${examId}/answers/bulk`, {
-        method: "POST",
-        body: JSON.stringify({ answers: payload }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        throw new Error(body?.message ?? `HTTP ${res.status}`)
-      }
-      try {
-        localStorage.removeItem(lsKey(examId, participantId))
-      } catch {}
-      setServerMarks({ ...marks })
-      setConfirmOpen(false)
-      setFeedback({
-        kind: "success",
-        message: `Enviadas ${payload.length} respostas.`,
-      })
-      setTimeout(() => router.push(`/manage/aplicar/${examId}`), 1200)
-    } catch (e) {
-      setConfirmOpen(false)
-      setFeedback({
-        kind: "error",
-        message:
-          e instanceof Error ? `Erro ao enviar: ${e.message}` : "Erro ao enviar.",
-      })
-    } finally {
-      setSending(false)
-    }
+    const payload = questions
+      .filter((q) => marks[q.id])
+      .map((q) => ({
+        userId: Number(participantId),
+        questId: q.id,
+        alternativa: marks[q.id],
+      }))
+    bulkAnswers.mutate(payload, {
+      onSuccess: () => {
+        try {
+          localStorage.removeItem(lsKey(examId, participantId))
+        } catch {}
+        setServerMarks({ ...marks })
+        setConfirmOpen(false)
+        setFeedback({
+          kind: "success",
+          message: `Enviadas ${payload.length} respostas.`,
+        })
+        setTimeout(() => router.push(`/manage/aplicar/${examId}`), 1200)
+      },
+      onError: (e) => {
+        setConfirmOpen(false)
+        setFeedback({
+          kind: "error",
+          message:
+            e instanceof Error ? `Erro ao enviar: ${e.message}` : "Erro ao enviar.",
+        })
+      },
+    })
   }
 
   return (
@@ -271,7 +265,9 @@ export default function CorretorPage() {
 
       {loading && <p className="text-sm text-read-gray">Carregando prova…</p>}
 
-      {!loading && error && <p className="text-sm text-red-400">{error}</p>}
+      {!loading && error && (
+        <p className="text-sm text-red-400">Não foi possível carregar a prova.</p>
+      )}
 
       {!loading && !error && total === 0 && (
         <p className="text-sm text-read-gray">
@@ -378,7 +374,7 @@ export default function CorretorPage() {
             <Button
               onClick={() => {
                 if (blanks.length > 0) setConfirmOpen(true)
-                else void send()
+                else send()
               }}
               disabled={sending || answered === 0}
               className="ml-auto bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white disabled:opacity-50"
@@ -412,7 +408,7 @@ export default function CorretorPage() {
               Voltar
             </Button>
             <Button
-              onClick={() => void send()}
+              onClick={send}
               disabled={sending}
               className="bg-read-green text-read-logo-dark hover:bg-read-green-dark hover:text-white"
             >

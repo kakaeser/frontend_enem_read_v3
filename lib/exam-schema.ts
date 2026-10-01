@@ -13,3 +13,20 @@ export const examSchema = z.object({
 })
 
 export type ExamPayload = z.infer<typeof examSchema>
+
+export const createExamSchema = z.object({
+  nome: z
+    .string({ error: "Nome inválido." })
+    .trim()
+    .min(3, { error: "Nome deve ter ao menos 3 caracteres." }),
+  qtdQuestoes: z
+    .number({ error: "Quantidade inválida." })
+    .int({ error: "Quantidade deve ser um número inteiro." })
+    .min(1, { error: "Informe ao menos 1 questão." }),
+  notaSimbolica: z
+    .number({ error: "Nota simbólica inválida." })
+    .int({ error: "Nota simbólica deve ser um número inteiro." })
+    .min(1, { error: "Nota simbólica deve ser ≥ 1." }),
+})
+
+export type CreateExamFormValues = z.infer<typeof createExamSchema>

@@ -1,16 +1,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-
-function decodePayload(token: string): {
-  type?: string
-  provaId?: number
-} | null {
-  try {
-    return JSON.parse(atob(token.split(".")[1]))
-  } catch {
-    return null
-  }
-}
+import { hasValidAdmSession } from "@/lib/adm-session"
+import { decodeJwtPayload } from "@/lib/auth-token"
+import { getAplicadorAccessToken } from "@/lib/bearer-token"
 
 // ADM entra em qualquer prova; aplicador só na própria provaId.
 export function useAplicarAuth(examId: string): boolean {
@@ -18,8 +10,13 @@ export function useAplicarAuth(examId: string): boolean {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    const payload = token ? decodePayload(token) : null
+    if (hasValidAdmSession()) {
+      const t = setTimeout(() => setReady(true), 0)
+      return () => clearTimeout(t)
+    }
+
+    const token = getAplicadorAccessToken()
+    const payload = token ? decodeJwtPayload(token) : null
     if (!token || !payload) {
       router.replace("/login")
       return
@@ -31,8 +28,6 @@ export function useAplicarAuth(examId: string): boolean {
       router.replace("/login")
       return
     }
-    // Assíncrono de propósito: evita setState síncrono no effect
-    // (regra react-hooks/set-state-in-effect).
     const t = setTimeout(() => setReady(true), 0)
     return () => clearTimeout(t)
   }, [router, examId])
