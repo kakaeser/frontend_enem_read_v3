@@ -1,10 +1,12 @@
 import { useMutation } from "@tanstack/react-query"
+import { setAdmAccessToken } from "@/lib/adm-session"
+import { clearAplicadorAccessToken } from "@/lib/bearer-token"
 import { publicAxiosRequest } from "@/lib/api"
 import type { AdmLoginFormValues } from "@/lib/login-schema"
 
 type LoginResponse = {
   access_token: string
-  refresh_token?: string
+  adm?: { id: number; email: string }
 }
 
 async function admLogin(values: AdmLoginFormValues): Promise<LoginResponse> {
@@ -17,10 +19,8 @@ export function useAdmLogin() {
   return useMutation({
     mutationFn: admLogin,
     onSuccess: (data) => {
-      localStorage.setItem("access_token", data.access_token)
-      if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token)
-      }
+      clearAplicadorAccessToken()
+      setAdmAccessToken(data.access_token)
     },
   })
 }

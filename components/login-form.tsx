@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { decodeJwtPayload, isAccessTokenValid } from "@/lib/auth-token"
+import { hasValidAdmSession, migrateLegacyAdmStorage } from "@/lib/adm-session"
+import { tryRefreshAdmSession } from "@/lib/api"
 import { admLoginSchema, type AdmLoginFormValues } from "@/lib/login-schema"
 import { useAdmLogin } from "@/hooks/use-adm-login"
 
@@ -24,11 +25,18 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   })
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    if (!token || !isAccessTokenValid(token)) return
-    const payload = decodeJwtPayload(token)
-    if (payload?.type === "aplicador") router.replace("/aguardando")
-    else router.replace("/manage")
+    let cancelled = false
+    void (async () => {
+      migrateLegacyAdmStorage()
+      if (!hasValidAdmSession()) {
+        await tryRefreshAdmSession()
+      }
+      if (cancelled) return
+      if (hasValidAdmSession()) router.replace("/manage")
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [router])
 
   function onSubmit(values: AdmLoginFormValues) {

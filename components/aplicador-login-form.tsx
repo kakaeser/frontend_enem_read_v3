@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { decodeJwtPayload, isAccessTokenValid } from "@/lib/auth-token"
+import { hasValidAdmSession } from "@/lib/adm-session"
+import { getAplicadorAccessToken } from "@/lib/bearer-token"
 import {
   aplicadorLoginSchema,
   type AplicadorLoginFormValues,
@@ -32,11 +33,11 @@ export function AplicadorLoginForm({ className, ...props }: React.ComponentProps
   const noExams = !examsLoading && exams.length === 0
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    if (!token || !isAccessTokenValid(token)) return
-    const payload = decodeJwtPayload(token)
-    if (payload?.type === "adm") router.replace("/manage")
-    else router.replace("/aguardando")
+    if (hasValidAdmSession()) {
+      router.replace("/manage")
+      return
+    }
+    if (getAplicadorAccessToken()) router.replace("/aguardando")
   }, [router])
 
   function onSubmit(values: AplicadorLoginFormValues) {

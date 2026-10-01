@@ -1,4 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
+import {
+  getAplicadorAccessToken,
+  setAplicadorAccessToken,
+} from "@/lib/bearer-token"
 import { authAxiosRequest, axiosHttp, publicAxiosRequest } from "@/lib/api"
 
 export type AplicadorApprovalStatus = "PENDENTE" | "APROVADO" | "REJEITADO"
@@ -48,8 +52,7 @@ export async function resolveAplicadorApprovalStatus(
   nome: string,
   signal?: AbortSignal
 ): Promise<AplicadorApprovalStatus | null> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+  const token = getAplicadorAccessToken()
   if (token) {
     const payload = decodeAplicadorJwtPayload(token)
     const meStatus = await getAplicadorMeStatus(signal)
@@ -90,10 +93,10 @@ export async function loginAplicadorAndStoreToken(
   const { data, status } = await axiosHttp<{ access_token?: string }>(
     "POST",
     "/auth/aplicador",
-    { data: { nome, provaId } }
+    { data: { nome, provaId }, auth: false }
   )
   if (status >= 200 && status < 300 && data.access_token) {
-    localStorage.setItem("access_token", data.access_token)
+    setAplicadorAccessToken(data.access_token)
     localStorage.removeItem("pending_aplicador_nome")
     localStorage.removeItem("pending_aplicador_provaId")
     return true

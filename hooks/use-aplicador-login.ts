@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query"
+import { setAplicadorAccessToken } from "@/lib/bearer-token"
 import { axiosHttp } from "@/lib/api"
 import type { AplicadorLoginFormValues } from "@/lib/login-schema"
 
@@ -12,17 +13,19 @@ async function aplicadorLogin(
   const nome = values.nome.trim()
   const provaId = values.provaId
 
-  const res = await axiosHttp<{ access_token?: string; refresh_token?: string; message?: string }>(
+  const res = await axiosHttp<{ access_token?: string; message?: string }>(
     "POST",
     "/auth/aplicador",
     {
       data: { nome, provaId: Number(provaId) },
+      auth: false,
     }
   )
 
   if (res.status === 404) {
     const c = await axiosHttp("POST", "/aplicadores", {
       data: { nome, provaId: Number(provaId) },
+      auth: false,
     })
     if (c.status < 200 || c.status >= 300) {
       throw new Error("Erro ao solicitar acesso")
@@ -48,10 +51,9 @@ async function aplicadorLogin(
     throw new Error(msgText || "Acesso pendente ou rejeitado.")
   }
 
-  const { access_token, refresh_token } = res.data
+  const { access_token } = res.data
   if (!access_token) throw new Error("Resposta de login inválida.")
-  localStorage.setItem("access_token", access_token)
-  if (refresh_token) localStorage.setItem("refresh_token", refresh_token)
+  setAplicadorAccessToken(access_token)
   localStorage.removeItem("pending_aplicador_nome")
   localStorage.removeItem("pending_aplicador_provaId")
   return { kind: "authenticated" }

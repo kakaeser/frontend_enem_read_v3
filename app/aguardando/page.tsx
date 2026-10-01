@@ -10,6 +10,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { hasValidAdmSession } from "@/lib/adm-session"
+import {
+  clearAplicadorAccessToken,
+  getAplicadorAccessToken,
+} from "@/lib/bearer-token"
 import {
   clearPendingAplicadorSession,
   decodeAplicadorJwtPayload,
@@ -25,12 +30,12 @@ export default function AguardandoPage() {
   const [sessionReady, setSessionReady] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    const payload = token ? decodeAplicadorJwtPayload(token) : null
-    if (payload?.type === "adm") {
+    if (hasValidAdmSession()) {
       router.replace("/manage")
       return
     }
+    const token = getAplicadorAccessToken()
+    const payload = token ? decodeAplicadorJwtPayload(token) : null
     const params = new URLSearchParams(window.location.search)
     const qNome = params.get("nome")
     const qProva = params.get("provaId")
@@ -62,7 +67,7 @@ export default function AguardandoPage() {
 
   useEffect(() => {
     if (!provaId || status !== "APROVADO") return
-    const token = localStorage.getItem("access_token")
+    const token = getAplicadorAccessToken()
     void (async () => {
       if (!token && nome) {
         await loginAplicadorAndStoreToken(nome, Number(provaId))
@@ -75,6 +80,7 @@ export default function AguardandoPage() {
 
   useEffect(() => {
     if (status === "REJEITADO") {
+      clearAplicadorAccessToken()
       clearPendingAplicadorSession()
     }
   }, [status])
@@ -128,8 +134,7 @@ export default function AguardandoPage() {
           <CardContent>
             <Button
               onClick={() => {
-                localStorage.removeItem("access_token")
-                localStorage.removeItem("refresh_token")
+                clearAplicadorAccessToken()
                 clearPendingAplicadorSession()
                 router.replace("/login/aplicador")
               }}
