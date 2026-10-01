@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { buildRootMetadata } from "@/lib/site-metadata";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,10 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Enem da Read",
-  description: "Site Oficial do Enem da Rede de Adolescentes da Oitava Igreja Presbiteriana de Belo Horizonte",
-};
+export const metadata = buildRootMetadata();
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

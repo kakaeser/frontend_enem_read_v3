@@ -17,7 +17,7 @@ export const privacidadeSections: LegalSection[] = [
       "Participantes da prova: nome, registro de presença, alternativas marcadas em cada questão, notas (objetiva e redação) e demais informações necessárias à correção e ao ranking.",
       "Aplicadores: nome, vínculo à prova, status de aprovação (pendente, aprovado ou rejeitado) e ações de correção permitidas pelo ADM.",
       "Administradores (ADM): endereço de e-mail e senha (armazenada apenas em forma criptografada no servidor, nunca em texto puro).",
-      "Dados técnicos: tokens de sessão (JWT e, quando aplicável, refresh token) guardados no navegador (localStorage) para manter o login; registros de acesso gerados pelos provedores de hospedagem (Cloudflare, Render e Neon), conforme suas políticas.",
+      "Dados técnicos: sessão de administrador (ADM) — token de acesso (JWT) mantido apenas em memória no navegador; token de renovação (refresh) em cookie HttpOnly (não legível por scripts da página). Sessão de aplicador: JWT no armazenamento local do navegador (localStorage). Registros de acesso gerados pelos provedores de hospedagem (Cloudflare, Render e Neon), conforme suas políticas.",
     ],
   },
   {

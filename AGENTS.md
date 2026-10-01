@@ -80,15 +80,16 @@ Gaps legados ainda relevantes: validação `user.examId == quest.examId` é na a
 - `/` login com toggle ADM (email/senha → `POST /auth/login`) vs Aplicador (nome+provaId → `POST /auth/aplicador`); botão "Entrar como aplicador" só habilita se `GET /exams?status=in_progress` retorna >0.
 - `/resultados` público — só libera se `now >= encerramento + 2 dias` (403 antes). Lista provas; `/resultados/[examId]` mostra top 15 (nome) + dialog **Consulta individual** (código) → sheet com detalhe por questão.
 - `/manage/[examId]` — painel ADM: status `draft→in_progress→completed` (popup warning ao encerrar), rank ao vivo + drawer lateral ao clicar aluno (editar `presenca`/`redacaoNota`). Subrotas: `/manage/[examId]/participantes`, `/manage/[examId]/questoes` (edição dinâmica bulk).
-- Auth: JWT Bearer 1h (`JWT_SECRET`/`JWT_EXPIRES_IN` no backend `.env`). Aplicador sem senha, só `APROVADO` + `Exam in_progress` libera.
+- Auth: JWT Bearer 1h (`JWT_SECRET`/`JWT_EXPIRES_IN` no backend `.env`). **ADM:** access só em memória (`lib/adm-session.ts`); refresh em cookie HttpOnly (`POST /auth/refresh` e `/auth/logout` com `withCredentials` no axios). **Aplicador:** JWT no `localStorage`; sem senha, só `APROVADO` + `Exam in_progress` libera. Rotas públicas de convite/reset: `/aceitar-convite`, `/esqueci-senha`, `/redefinir-senha`.
 
 > Sem WebSocket no MVP — ranking estático; ver `../backend_enem_read_v3/.agents/specs/spec-enem-read-v3-mvp.md`.
 
 ## Infra / Deploy
 
-- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com a API via HTTPS (`NEXT_PUBLIC_API_URL` → URL do Render).
+- Frontend → **Cloudflare Workers** via OpenNext (`@opennextjs/cloudflare`, `wrangler.jsonc`, `npm run deploy`). Sem bindings: o frontend fala com a API via HTTPS (`NEXT_PUBLIC_API_URL` → URL do Render). Open Graph / `metadataBase`: `NEXT_PUBLIC_SITE_URL` no build (ex.: `https://enemread.com.br`; fallback no código se omitido).
 - Backend → **Render** — NestJS com `PORT` injetado (`process.env.PORT ?? 3030`); deploy via `Dockerfile` (multi-stage) ou build nativo no Render. Env: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`. Detalhes em `../backend_enem_read_v3/AGENTS.md` e `../backend_enem_read_v3/docs/render-keep-alive.md`.
 - DB → **Neon Postgres** (só no backend) — `DATABASE_URL` (pooler) + `DIRECT_URL` (conexão direta / `DATABASE_URL_UNPOOLED`) no `.env` do backend (gitignored). Prisma: `directUrl = env("DIRECT_URL")` em `prisma/schema.prisma`.
+- **CORS + cookies (ADM):** o backend usa `credentials: true` e origens explícitas em `FRONTEND_URL` (lista separada por vírgula). A origem do front em produção (Cloudflare) e `http://localhost:3000` em dev precisam estar na lista; senão login/refresh e links absolutos de e-mail (convite/reset) falham entre domínios.
 
 ## Gotchas
 

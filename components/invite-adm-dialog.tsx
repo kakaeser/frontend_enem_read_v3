@@ -65,7 +65,7 @@ export function InviteAdmDialog() {
             variant="outline"
             className="rounded-full bg-read-green text-read-logo-dark font-semibold hover:border-read-green-dark hover:bg-read-green-dark hover:text-white transition-colors"
           >
-            Convidar ADM
+            Cadastrar ADM
           </Button>
         }
       />
