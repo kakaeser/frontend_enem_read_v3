@@ -82,9 +82,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   <FieldLabel htmlFor="password" className="text-read-white">
                     Senha
                   </FieldLabel>
-                  <a href="#" className="ml-auto text-sm text-read-blue-light hover:text-read-green underline-offset-2 hover:underline">
+                  <Link
+                    href="/esqueci-senha"
+                    className="ml-auto text-sm text-read-blue-light hover:text-read-green underline-offset-2 hover:underline"
+                  >
                     Esqueceu a senha?
-                  </a>
+                  </Link>
                 </div>
                 <Input
                   id="password"
