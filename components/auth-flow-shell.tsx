@@ -2,18 +2,11 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 
 type AuthFlowShellProps = {
-  title: string
-  description: string
   children: React.ReactNode
   className?: string
 }
 
-export function AuthFlowShell({
-  title,
-  description,
-  children,
-  className,
-}: AuthFlowShellProps) {
+export function AuthFlowShell({ children, className }: AuthFlowShellProps) {
   return (
     <Card
       className={cn(
