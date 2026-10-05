@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { Plus } from "lucide-react"
-import { FormProvider, useFieldArray, useForm } from "react-hook-form"
-import { Accordion } from "@/components/ui/accordion"
+import { FormProvider, useForm } from "react-hook-form"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,9 +16,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   normalizeAlternativas,
-  QuestionAccordionItem,
   type QuestionFeedback,
 } from "@/components/question-accordion-item"
+import {
+  QuestionsAccordionList,
+  type QuestionsAccordionListHandle,
+} from "@/components/questions-accordion-list"
 import {
   useBulkUpsertExamQuestions,
   useDeleteExamQuestion,
@@ -57,6 +59,18 @@ function toPayload(d: QuestionFormItem): QuestionBulkPayload {
   return payload
 }
 
+function countDirtyQuestions(questions: QuestionFormItem[]) {
+  return questions.filter((d) => d.dirty).length
+}
+
+function shouldRecountDirtyOnFieldChange(name: string | undefined) {
+  if (!name) return false
+  if (name === "questions") return true
+  if (name.endsWith(".dirty")) return true
+  if (name.endsWith(".id") || name.endsWith(".numero")) return true
+  return false
+}
+
 export default function QuestoesPage() {
   const { examId } = useParams<{ examId: string }>()
   const {
@@ -70,27 +84,34 @@ export default function QuestoesPage() {
   const form = useForm<QuestionsFormValues>({
     defaultValues: { questions: [] },
   })
-  const { fields, append } = useFieldArray({
-    control: form.control,
-    name: "questions",
-    keyName: "fieldKey",
-  })
 
+  const listRef = useRef<QuestionsAccordionListHandle>(null)
+  const [questionCount, setQuestionCount] = useState(0)
   const [feedback, setFeedback] = useState<Record<number, QuestionFeedback>>({})
   const [savingIds, setSavingIds] = useState<number[]>([])
   const [deleteTarget, setDeleteTarget] = useState<QuestionFormItem | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [dirtyCount, setDirtyCount] = useState(0)
   const tempId = useRef(-1)
   const hydratedExamId = useRef<string | null>(null)
 
-  const questions = form.watch("questions")
-  const dirtyCount = questions.filter((d) => d.dirty).length
   const savingAll = bulkUpsert.isPending && savingIds.length === 0
+
+  const syncDirtyCount = useCallback(() => {
+    const next = countDirtyQuestions(form.getValues("questions"))
+    setDirtyCount((prev) => (prev === next ? prev : next))
+  }, [form])
+
+  const syncQuestionCount = useCallback(() => {
+    setQuestionCount(form.getValues("questions").length)
+  }, [form])
 
   useEffect(() => {
     hydratedExamId.current = null
     form.reset({ questions: [] })
     setFeedback({})
+    setDirtyCount(0)
+    setQuestionCount(0)
   }, [examId, form])
 
   useEffect(() => {
@@ -98,7 +119,25 @@ export default function QuestoesPage() {
     if (hydratedExamId.current === examId) return
     hydratedExamId.current = examId
     form.reset({ questions: serverQuestions.map(toFormItem) })
+    setDirtyCount(0)
+    setQuestionCount(serverQuestions.length)
   }, [examId, serverQuestions, isLoading, isError, form])
+
+  useEffect(() => {
+    const subscription = form.watch((_value, { name }) => {
+      if (shouldRecountDirtyOnFieldChange(name)) {
+        syncDirtyCount()
+      }
+      if (
+        name === "questions" ||
+        name?.endsWith(".id") ||
+        name?.endsWith(".numero")
+      ) {
+        syncQuestionCount()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form, syncDirtyCount, syncQuestionCount])
 
   function clearFeedback(questionId: number) {
     setFeedback((prev) => {
@@ -109,32 +148,36 @@ export default function QuestoesPage() {
     })
   }
 
-  function applySaved(saved: ExamQuestion[]) {
-    const prev = form.getValues("questions")
-    const byId = new Map(saved.map((q) => [q.id, q]))
-    const used = new Set<number>()
-    const updated = prev.map((d) => {
-      if (d.id >= 0) {
-        const s = byId.get(d.id)
+  const applySaved = useCallback(
+    (saved: ExamQuestion[]) => {
+      const prev = form.getValues("questions")
+      const byId = new Map(saved.map((q) => [q.id, q]))
+      const used = new Set<number>()
+      const updated = prev.map((d) => {
+        if (d.id >= 0) {
+          const s = byId.get(d.id)
+          if (s) {
+            used.add(s.id)
+            return { ...toFormItem(s), dirty: false }
+          }
+          return d
+        }
+        const s = saved.find((q) => q.numero === d.numero && !used.has(q.id))
         if (s) {
           used.add(s.id)
           return { ...toFormItem(s), dirty: false }
         }
         return d
-      }
-      const s = saved.find((q) => q.numero === d.numero && !used.has(q.id))
-      if (s) {
-        used.add(s.id)
-        return { ...toFormItem(s), dirty: false }
-      }
-      return d
-    })
-    form.setValue("questions", updated, { shouldDirty: false })
-  }
+      })
+      form.setValue("questions", updated, { shouldDirty: false })
+    },
+    [form]
+  )
 
   function addQuestion() {
+    const questions = form.getValues("questions")
     const max = questions.reduce((m, d) => Math.max(m, d.numero), 0)
-    append({
+    listRef.current?.appendQuestion({
       id: tempId.current--,
       numero: max + 1,
       enunciado: "",
@@ -143,58 +186,62 @@ export default function QuestoesPage() {
       peso: 1,
       dirty: true,
     })
+    setQuestionCount(questions.length + 1)
   }
 
-  async function saveOne(index: number) {
-    const draft = form.getValues(`questions.${index}`)
-    if (!draft) return
-    setSavingIds((prev) => [...prev, draft.id])
-    clearFeedback(draft.id)
-    const validated = validateBulkPayload([toPayload(draft)])
-    if ("errors" in validated) {
-      setFeedback((prev) => ({
-        ...prev,
-        [draft.id]: {
-          kind: "error",
-          message: validated.errors.get(0) ?? "Dados da questão inválidos.",
-        },
-      }))
-      setSavingIds((prev) => prev.filter((id) => id !== draft.id))
-      return
-    }
-    try {
-      const saved = await bulkUpsert.mutateAsync(validated.data)
-      applySaved(saved)
-      setFeedback((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          saved.map((q) => [
-            q.id,
-            {
-              kind: "success",
-              message: "Questão salva com sucesso.",
-            } as QuestionFeedback,
-          ])
-        ),
-      }))
-    } catch (e) {
-      setFeedback((prev) => ({
-        ...prev,
-        [draft.id]: {
-          kind: "error",
-          message:
-            e instanceof Error
-              ? `Erro ao salvar: ${e.message}`
-              : "Erro ao salvar a questão.",
-        },
-      }))
-    } finally {
-      setSavingIds((prev) => prev.filter((id) => id !== draft.id))
-    }
-  }
+  const saveOne = useCallback(
+    async (index: number) => {
+      const draft = form.getValues(`questions.${index}`)
+      if (!draft) return
+      setSavingIds((prev) => [...prev, draft.id])
+      clearFeedback(draft.id)
+      const validated = validateBulkPayload([toPayload(draft)])
+      if ("errors" in validated) {
+        setFeedback((prev) => ({
+          ...prev,
+          [draft.id]: {
+            kind: "error",
+            message: validated.errors.get(0) ?? "Dados da questão inválidos.",
+          },
+        }))
+        setSavingIds((prev) => prev.filter((id) => id !== draft.id))
+        return
+      }
+      try {
+        const saved = await bulkUpsert.mutateAsync(validated.data)
+        applySaved(saved)
+        setFeedback((prev) => ({
+          ...prev,
+          ...Object.fromEntries(
+            saved.map((q) => [
+              q.id,
+              {
+                kind: "success",
+                message: "Questão salva com sucesso.",
+              } as QuestionFeedback,
+            ])
+          ),
+        }))
+      } catch (e) {
+        setFeedback((prev) => ({
+          ...prev,
+          [draft.id]: {
+            kind: "error",
+            message:
+              e instanceof Error
+                ? `Erro ao salvar: ${e.message}`
+                : "Erro ao salvar a questão.",
+          },
+        }))
+      } finally {
+        setSavingIds((prev) => prev.filter((id) => id !== draft.id))
+      }
+    },
+    [applySaved, bulkUpsert, form]
+  )
 
   async function saveAll() {
-    const dirty = questions.filter((d) => d.dirty)
+    const dirty = form.getValues("questions").filter((d) => d.dirty)
     if (dirty.length === 0) return
     const validated = validateBulkPayload(dirty.map(toPayload))
     if ("errors" in validated) {
@@ -234,6 +281,14 @@ export default function QuestoesPage() {
       }))
     }
   }
+
+  const requestDelete = useCallback(
+    (index: number) => {
+      const item = form.getValues(`questions.${index}`)
+      if (item) setDeleteTarget(item)
+    },
+    [form]
+  )
 
   async function confirmDelete() {
     const target = deleteTarget
@@ -296,8 +351,16 @@ export default function QuestoesPage() {
   }
 
   const deleteMax = deleteTarget
-    ? questions.reduce((m, d) => Math.max(m, d.numero), 0)
+    ? form
+        .getValues("questions")
+        .reduce((m, d) => Math.max(m, d.numero), 0)
     : 0
+
+  const nextQuestionNumero =
+    questionCount === 0
+      ? 1
+      : form.getValues("questions").reduce((m, d) => Math.max(m, d.numero), 0) +
+        1
 
   return (
     <FormProvider {...form}>
@@ -307,8 +370,8 @@ export default function QuestoesPage() {
             <h1 className="text-xl font-bold text-read-white">Questões</h1>
             {!isLoading && (
               <Badge className="bg-read-ink text-read-gray">
-                {questions.length}{" "}
-                {questions.length === 1 ? "questão" : "questões"}
+                {questionCount}{" "}
+                {questionCount === 1 ? "questão" : "questões"}
               </Badge>
             )}
             {dirtyCount > 0 && (
@@ -339,32 +402,24 @@ export default function QuestoesPage() {
           </p>
         )}
 
-        {!isLoading && !isError && questions.length === 0 && (
+        {!isLoading && !isError && questionCount === 0 && (
           <p className="text-sm text-read-gray">
             Nenhuma questão cadastrada para esta prova.
           </p>
         )}
 
-        {!isLoading && !isError && questions.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-read-ink bg-read-ink-dark">
-            <Accordion>
-              {fields.map((field, index) => {
-                const q = questions[index]
-                if (!q) return null
-                return (
-                  <QuestionAccordionItem
-                    key={field.fieldKey}
-                    index={index}
-                    saving={savingIds.includes(q.id) || savingAll}
-                    deleting={deleting && deleteTarget?.id === q.id}
-                    feedback={feedback[q.id] ?? null}
-                    onSave={() => saveOne(index)}
-                    onDelete={() => setDeleteTarget(q)}
-                  />
-                )
-              })}
-            </Accordion>
-          </div>
+        {!isLoading && !isError && questionCount > 0 && (
+          <QuestionsAccordionList
+            ref={listRef}
+            control={form.control}
+            savingIds={savingIds}
+            savingAll={savingAll}
+            deleting={deleting}
+            deleteTargetId={deleteTarget?.id ?? null}
+            feedbackById={feedback}
+            onSave={saveOne}
+            onDelete={requestDelete}
+          />
         )}
 
         {!isLoading && !isError && (
@@ -375,8 +430,7 @@ export default function QuestoesPage() {
             className="w-full border-dashed border-read-ink bg-transparent text-read-gray hover:border-read-green hover:bg-transparent hover:text-read-green"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Adicionar questão{" "}
-            {questions.reduce((m, d) => Math.max(m, d.numero), 0) + 1}
+            Adicionar questão {nextQuestionNumero}
           </Button>
         )}
 
