@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { authAxiosRequest } from "@/lib/api"
+import { fetchAllPaginatedAuth } from "@/lib/pagination-types"
 import { patchParticipantRedacao } from "@/hooks/use-student-detail"
 
 export type ExamPresente = {
   id: number
   nome: string
   redacaoNota?: number | null
+  presenca?: boolean
   _count?: { answers: number }
 }
 
@@ -17,12 +18,11 @@ export async function getExamPresentes(
   examId: string,
   signal?: AbortSignal
 ): Promise<ExamPresente[]> {
-  const data = await authAxiosRequest<ExamPresente[]>(
-    "GET",
+  return fetchAllPaginatedAuth<ExamPresente>(
     `/exams/${examId}/participants/presentes`,
-    { signal }
+    {},
+    signal
   )
-  return Array.isArray(data) ? data : []
 }
 
 export function useExamPresentes(examId: string, enabled = true) {

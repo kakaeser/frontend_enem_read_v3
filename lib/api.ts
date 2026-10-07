@@ -13,16 +13,23 @@ import {
 export const apiBase =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3030"
 
+const appApiKey = process.env.NEXT_PUBLIC_APP_API_KEY?.trim()
+
 function resolveUrl(path: string): string {
   return path.startsWith("http") ? path : `${apiBase}${path}`
 }
 
-function authHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined" ? getBearerToken() : null
+function baseHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(appApiKey ? { "X-App-Api-Key": appApiKey } : {}),
+    ...extra,
   }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? getBearerToken() : null
+  return baseHeaders(token ? { Authorization: `Bearer ${token}` } : undefined)
 }
 
 function messageFromResponseData(data: unknown, status: number): string {
@@ -45,7 +52,7 @@ export async function tryRefreshAdmSession(): Promise<string | null> {
       undefined,
       {
         ...axiosDefaults,
-        headers: { "Content-Type": "application/json" },
+        headers: baseHeaders(),
         validateStatus: (s) => s < 500,
       }
     )
@@ -66,10 +73,16 @@ export const tryRefresh = tryRefreshAdmSession
 
 export type AxiosHttpResult<T> = { data: T; status: number }
 
+export type RequestParams = Record<
+  string,
+  string | number | boolean | undefined
+>
+
 type RequestOptions = {
   data?: unknown
   signal?: AbortSignal
   auth?: boolean
+  params?: RequestParams
 }
 
 /** Low-level HTTP: returns status + body; does not throw on 4xx. Optional auth + 401 refresh retry. */
@@ -87,11 +100,10 @@ export async function axiosHttp<T>(
       method,
       url,
       data: options?.data,
+      params: options?.params,
       signal: options?.signal,
       ...axiosDefaults,
-      headers: useAuth
-        ? authHeaders()
-        : { "Content-Type": "application/json" },
+      headers: useAuth ? authHeaders() : baseHeaders(),
       validateStatus: (s) => s < 500,
     }).then((res) => ({ res, bearer }))
   }
@@ -155,7 +167,7 @@ export async function logoutSession(): Promise<void> {
       undefined,
       {
         ...axiosDefaults,
-        headers: { "Content-Type": "application/json" },
+        headers: baseHeaders(),
         validateStatus: (s) => s < 500,
       }
     )

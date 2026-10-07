@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { publicAxiosRequest } from "@/lib/api"
+import { fetchAllPaginatedPublic } from "@/lib/pagination-types"
 
 export type InProgressExam = {
   id: number
@@ -10,12 +10,11 @@ export type InProgressExam = {
 export const inProgressExamsQueryKey = ["exams", "in_progress"] as const
 
 async function getInProgressExams(signal?: AbortSignal): Promise<InProgressExam[]> {
-  const data = await publicAxiosRequest<InProgressExam[]>(
-    "GET",
-    "/exams?status=in_progress",
-    { signal }
+  return fetchAllPaginatedPublic<InProgressExam>(
+    "/exams",
+    { status: "in_progress" },
+    signal
   )
-  return Array.isArray(data) ? data : []
 }
 
 export function useInProgressExams() {
