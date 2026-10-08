@@ -21,6 +21,17 @@ export function examParticipantsQueryKey(examId: string) {
   return ["exam-participants", examId] as const
 }
 
+function isPaginatedParticipants(
+  cached: unknown
+): cached is PaginatedResponse<ExamParticipant> {
+  return (
+    typeof cached === "object" &&
+    cached !== null &&
+    "data" in cached &&
+    Array.isArray((cached as PaginatedResponse<ExamParticipant>).data)
+  )
+}
+
 export type ParticipantsListParams = Pick<ListQueryParams, "page" | "limit" | "search">
 
 export async function getExamParticipants(
@@ -136,7 +147,7 @@ export function useUpdateParticipantPresenca(examId: string) {
         queryKey: examParticipantsQueryKey(examId),
       })
       for (const [key, cached] of previous) {
-        if (!cached) continue
+        if (!isPaginatedParticipants(cached)) continue
         queryClient.setQueryData<PaginatedResponse<ExamParticipant>>(key, {
           ...cached,
           data: cached.data.map((p) =>
