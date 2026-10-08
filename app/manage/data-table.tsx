@@ -2,12 +2,30 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useTable, type ColumnDef, type RowData, type SortingState, type ColumnFiltersState } from "@tanstack/react-table"
+import {
+  useTable,
+  type ColumnDef,
+  type RowData,
+  type SortingState,
+  type ColumnFiltersState,
+} from "@tanstack/react-table"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { features, type DataTableFeatures } from "./data-table-features"
+
+export type ServerPaginationProps = {
+  page: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  isFetching?: boolean
+}
+
+export type ServerSearchProps = {
+  value: string
+  onChange: (value: string) => void
+}
 
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
@@ -20,6 +38,8 @@ interface DataTableProps<TData extends RowData> {
   showHeader?: boolean
   tableBorderClassName?: string
   tableBodyClassName?: string
+  pagination?: ServerPaginationProps
+  search?: ServerSearchProps
 }
 
 export function DataTable<TData extends RowData>({
@@ -33,22 +53,73 @@ export function DataTable<TData extends RowData>({
   showHeader = true,
   tableBorderClassName = "border-read-green",
   tableBodyClassName,
+  pagination,
+  search,
 }: DataTableProps<TData>) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const serverMode = Boolean(pagination)
 
   const table = useTable({
     features,
     data,
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
+    onColumnFiltersChange: serverMode ? undefined : setColumnFilters,
+    state: {
+      sorting,
+      ...(serverMode
+        ? {
+            pagination: {
+              pageIndex: 0,
+              pageSize: Math.max(data.length, 1),
+            },
+          }
+        : { columnFilters }),
+    },
   })
 
-  const filterColumn = table.getColumn(filterColumnId)
+  const filterColumn = serverMode ? undefined : table.getColumn(filterColumnId)
   const rowNavigation = Boolean(rowHref)
+
+  const searchValue = serverMode
+    ? (search?.value ?? "")
+    : ((filterColumn?.getFilterValue() as string) ?? "")
+
+  const handleSearchChange = (value: string) => {
+    if (serverMode) {
+      search?.onChange(value)
+    } else {
+      filterColumn?.setFilterValue(value)
+    }
+  }
+
+  const canPrevious = serverMode
+    ? pagination!.page > 1 && !pagination!.isFetching
+    : table.getCanPreviousPage()
+
+  const canNext = serverMode
+    ? pagination!.page < pagination!.totalPages &&
+        pagination!.totalPages > 0 &&
+        !pagination!.isFetching
+    : table.getCanNextPage()
+
+  const goPrevious = () => {
+    if (serverMode) {
+      pagination!.onPageChange(pagination!.page - 1)
+    } else {
+      table.previousPage()
+    }
+  }
+
+  const goNext = () => {
+    if (serverMode) {
+      pagination!.onPageChange(pagination!.page + 1)
+    } else {
+      table.nextPage()
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,14 +128,20 @@ export function DataTable<TData extends RowData>({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-read-gray" />
           <input
             placeholder={searchPlaceholder}
-            value={(filterColumn?.getFilterValue() as string) ?? ""}
-            onChange={(e) => filterColumn?.setFilterValue(e.target.value)}
+            value={searchValue}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="h-9 w-full rounded-lg border border-read-ink bg-read-ink-dark pl-9 pr-3 text-sm text-read-white placeholder:text-read-gray/60 focus:border-read-green focus:outline-none"
           />
         </div>
         {toolbarEnd}
       </div>
-      <div className={cn("overflow-hidden rounded-lg border", tableBorderClassName)}>
+      <div
+        className={cn(
+          "overflow-hidden rounded-lg border",
+          tableBorderClassName,
+          serverMode && pagination?.isFetching && "opacity-80"
+        )}
+      >
         <Table>
           {showHeader && (
             <TableHeader className="bg-read-logo-dark">
@@ -115,10 +192,27 @@ export function DataTable<TData extends RowData>({
         </Table>
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="border-read-ink bg-read-ink text-read-white hover:bg-read-darkest hover:text-read-white">
+        {serverMode && pagination!.totalPages > 0 && (
+          <span className="mr-2 text-sm text-read-gray">
+            Página {pagination!.page} de {pagination!.totalPages}
+          </span>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goPrevious}
+          disabled={!canPrevious}
+          className="border-read-ink bg-read-ink text-read-white hover:bg-read-darkest hover:text-read-white"
+        >
           Anterior
         </Button>
-        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="border-read-ink bg-read-ink text-read-white hover:bg-read-darkest hover:text-read-white">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goNext}
+          disabled={!canNext}
+          className="border-read-ink bg-read-ink text-read-white hover:bg-read-darkest hover:text-read-white"
+        >
           Próxima
         </Button>
       </div>
